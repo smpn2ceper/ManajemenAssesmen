@@ -563,7 +563,7 @@
                         <div className="p-4 border-t border-slate-700"> <button onClick={()=>setUser(null)} className="flex items-center text-red-400 hover:text-red-300 transition w-full p-2"><i className="fas fa-sign-out-alt w-8"></i> Logout</button> </div>
                     </div>
                     <div className="flex-1 ml-64 p-8 overflow-y-auto h-screen print:ml-0 print:p-0">
-                         {page === 'dashboard' && <Dashboard stats={stats} schedules={schedules} subjects={subjects} rooms={rooms} students={students} />}
+                         {page === 'dashboard' && <Dashboard stats={stats} schedules={schedules} subjects={subjects} rooms={rooms} students={students} attendance={studentAttendance} />}
                          {page === 'master' && <DataMaster students={students} setStudents={setStudents} teachers={teachers} setTeachers={setTeachers} subjects={subjects} setSubjects={setSubjects} rooms={rooms} setRooms={setRooms} />}
                          {page === 'schedule' && <ScheduleManager subjects={subjects} rooms={rooms} teachers={teachers} schedules={schedules} setSchedules={setSchedules} />}
                          {page === 'print' && <PrintCenter schoolInfo={schoolInfo} students={students} rooms={rooms} subjects={subjects} schedules={schedules} teachers={teachers} />}
@@ -573,13 +573,171 @@
             );
         };
 
-        const Dashboard = ({ stats, schedules, subjects, rooms = [], students = [] }) => {
+        const Dashboard = ({ stats, schedules, subjects, rooms = [], students = [], attendance = {} }) => {
             const [date, setDate] = useState(new Date());
+            const [viewMode, setViewMode] = useState('grid');
+            
             useEffect(() => { const timer = setInterval(() => setDate(new Date()), 60000); return () => clearInterval(timer); }, []);
-            const readiness = Math.round(((stats.s > 0 ? 25 : 0) + (stats.t > 0 ? 25 : 0) + (stats.m > 0 ? 25 : 0) + (stats.sch > 0 ? 25 : 0)));
-            const totalCapacity = rooms.reduce((acc, curr) => acc + (parseInt(curr.capacity) || 0), 0);
             const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            return ( <div className="space-y-8 animate-fade-in-down pb-10"> <div className="flex flex-col md:flex-row justify-between items-end gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100"> <div><h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2><p className="text-slate-500 mt-1">Pantau aktivitas asesmen secara real-time (Online Mode).</p></div> <div className="text-right"><div className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-1">{date.toLocaleDateString('id-ID', dateOptions)}</div><p className="text-xs text-slate-400">Semester Ganjil 2023/2024</p></div> </div> <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"> <StatCard title="Total Peserta" value={stats.s || 0} icon="fa-user-graduate" color="text-blue-600" /> <StatCard title="Pengawas" value={stats.t || 0} icon="fa-chalkboard-teacher" color="text-emerald-600" /> <StatCard title="Mapel Ujian" value={stats.m || 0} icon="fa-book" color="text-violet-600" /> <StatCard title="Ruang Ujian" value={stats.r || 0} icon="fa-door-open" color="text-orange-600" /> </div> </div> );
+
+            // Logic Monitoring Ruang
+            const roomStats = rooms.map(room => {
+                const roomStudents = students.filter(s => String(s.roomId) === String(room.id));
+                const total = roomStudents.length;
+                
+                // Cari jadwal yang terhubung ke ruangan ini
+                const roomSchedules = schedules.filter(s => String(s.roomId) === String(room.id));
+                
+                // Cari siswa yang absen (Sakit, Izin, Alpha) di ruangan ini (kumulatif dari semua sesi yang tercatat)
+                // Kita gunakan Set untuk memastikan 1 siswa hanya dihitung 1x meskipun absen di beberapa mapel
+                const uniqueAbsentStudents = new Set();
+                
+                roomSchedules.forEach(sch => {
+                    const key = `${sch.subjectId}-${sch.roomId}`;
+                    const log = attendance[key] || {};
+                    Object.entries(log).forEach(([studentId, status]) => {
+                        if (['S', 'I', 'A'].includes(status)) {
+                            uniqueAbsentStudents.add(studentId);
+                        }
+                    });
+                });
+
+                const absentList = Array.from(uniqueAbsentStudents).map(id => {
+                    const st = students.find(s => String(s.id) === String(id));
+                    return st ? st.name : `ID: ${id}`;
+                });
+
+                return {
+                    ...room,
+                    total,
+                    absentCount: uniqueAbsentStudents.size,
+                    absentList
+                };
+            });
+
+            return ( 
+                <div className="space-y-8 animate-fade-in-down pb-10"> 
+                    <div className="flex flex-col md:flex-row justify-between items-end gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100"> 
+                        <div><h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2><p className="text-slate-500 mt-1">Pantau aktivitas asesmen secara real-time (Online Mode).</p></div> 
+                        <div className="text-right"><div className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-1">{date.toLocaleDateString('id-ID', dateOptions)}</div><p className="text-xs text-slate-400">Semester Ganjil 2023/2024</p></div> 
+                    </div> 
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"> 
+                        <StatCard title="Total Peserta" value={stats.s || 0} icon="fa-user-graduate" color="text-blue-600" /> 
+                        <StatCard title="Pengawas" value={stats.t || 0} icon="fa-chalkboard-teacher" color="text-emerald-600" /> 
+                        <StatCard title="Mapel Ujian" value={stats.m || 0} icon="fa-book" color="text-violet-600" /> 
+                        <StatCard title="Ruang Ujian" value={stats.r || 0} icon="fa-door-open" color="text-orange-600" /> 
+                    </div> 
+
+                    {/* NEW SECTION: MONITORING RUANG */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-rose-100 text-rose-600 w-8 h-8 rounded flex items-center justify-center"><i className="fas fa-clipboard-check"></i></div>
+                                <h3 className="font-bold text-slate-700 text-lg">Monitoring Kehadiran Per Ruang</h3>
+                            </div>
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                                <button 
+                                    onClick={() => setViewMode('grid')} 
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    <i className="fas fa-th-large mr-1"></i> Kartu
+                                </button>
+                                <button 
+                                    onClick={() => setViewMode('table')} 
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    <i className="fas fa-list mr-1"></i> Tabel
+                                </button>
+                            </div>
+                        </div>
+
+                        {viewMode === 'grid' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {roomStats.map(r => (
+                                    <div key={r.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 hover:bg-white hover:shadow-md transition duration-300">
+                                        <div className="flex justify-between items-start mb-3 border-b border-slate-200 pb-3">
+                                            <div>
+                                                <div className="font-bold text-slate-800 text-lg">{r.name}</div>
+                                                <div className="text-xs text-slate-500">Kapasitas: {r.capacity} Kursi</div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Siswa</div>
+                                                <div className="text-xl font-black text-slate-700">{r.total}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-xs font-bold text-rose-600 uppercase tracking-wide">Tidak Hadir</span>
+                                                <span className={`text-lg font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>
+                                                    {r.absentCount} <span className="text-xs font-normal text-slate-400">Siswa</span>
+                                                </span>
+                                            </div>
+                                            
+                                            {r.absentCount > 0 ? (
+                                                <div className="mt-2 space-y-1 max-h-24 overflow-y-auto custom-scrollbar">
+                                                    {r.absentList.map((name, i) => (
+                                                        <div key={i} className="text-xs text-slate-600 bg-rose-50 px-2 py-1 rounded border border-rose-100 flex items-center gap-2">
+                                                            <i className="fas fa-times-circle text-rose-400 text-[10px]"></i>
+                                                            <span className="truncate">{name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-xs text-emerald-600 bg-emerald-50 px-2 py-2 rounded border border-emerald-100 text-center font-medium">
+                                                    <i className="fas fa-check-circle mr-1"></i> Semua Hadir / Belum Absen
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b border-slate-200">
+                                        <tr>
+                                            <th className="px-4 py-3">Nama Ruang</th>
+                                            <th className="px-4 py-3 text-center">Kapasitas</th>
+                                            <th className="px-4 py-3 text-center">Total Siswa</th>
+                                            <th className="px-4 py-3 text-center">Hadir</th>
+                                            <th className="px-4 py-3 text-center">Tidak Hadir</th>
+                                            <th className="px-4 py-3 w-1/3">Detail Ketidakhadiran</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                        {roomStats.map(r => (
+                                            <tr key={r.id} className="hover:bg-slate-50">
+                                                <td className="px-4 py-3 font-bold text-slate-700">{r.name}</td>
+                                                <td className="px-4 py-3 text-center text-slate-500">{r.capacity}</td>
+                                                <td className="px-4 py-3 text-center font-bold">{r.total}</td>
+                                                <td className="px-4 py-3 text-center text-emerald-600 font-bold">{r.total - r.absentCount}</td>
+                                                <td className={`px-4 py-3 text-center font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
+                                                    {r.absentCount}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {r.absentCount > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {r.absentList.map((name, i) => (
+                                                                <span key={i} className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded border border-rose-100 truncate max-w-[150px]" title={name}>
+                                                                    {name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-emerald-500 italic"><i className="fas fa-check mr-1"></i> Lengkap</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div> 
+            );
         };
 
         const StatCard = ({ title, value, icon, color }) => (
