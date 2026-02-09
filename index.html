@@ -89,6 +89,10 @@
         /* --- PACT MODAL STYLE --- */
         .pact-content { max-height: 60vh; overflow-y: auto; background: #f9fafb; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e5e7eb; font-size: 0.9rem; line-height: 1.6; color: #374151; margin-bottom: 1rem; text-align: justify; }
         .pact-list { list-style-type: decimal; padding-left: 1.5rem; space-y: 0.5rem; }
+        
+        /* --- LABEL MEJA --- */
+        .desk-label-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10mm; height: 100%; }
+        .desk-label-card { border: 2px solid #000; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -367,6 +371,67 @@
             const [searchTerm, setSearchTerm] = useState('');
             const fileInputRef = useRef(null);
 
+            const generateExamNumbers = () => {
+                if (!confirm("Generate ulang No Ujian untuk semua siswa?")) return;
+                const prefix = "24"; 
+                const sortedStudents = [...students].sort((a, b) => {
+                    const classA = (a.class || "").toString();
+                    const classB = (b.class || "").toString();
+                    if (classA === classB) { return (a.name || "").localeCompare(b.name || ""); }
+                    return classA.localeCompare(classB);
+                });
+                const classCounters = {};
+                const updatedStudents = sortedStudents.map(student => {
+                    const rawClass = (student.class || "X").toString();
+                    if (!classCounters[rawClass]) { classCounters[rawClass] = 1; }
+                    const serial = String(classCounters[rawClass]).padStart(3, '0');
+                    const newExamNumber = `${prefix}-${rawClass.replace(/\s/g,'').toUpperCase().substring(0,3)}-${serial}`;
+                    classCounters[rawClass]++;
+                    return { ...student, examNumber: newExamNumber };
+                });
+                setStudents(updatedStudents);
+                alert('Nomor Ujian berhasil di-generate ulang!');
+            };
+
+            const downloadTemplate = () => {
+                const templateData = [
+                    { "Nama": "Contoh Siswa 1", "Kelas": "XII IPA 1", "No Ujian": "24-IPA-001", "ID Ruang (Angka)": 1 },
+                    { "Nama": "Contoh Siswa 2", "Kelas": "XII IPS 2", "No Ujian": "24-IPS-005", "ID Ruang (Angka)": 2 }
+                ];
+                const ws = XLSX.utils.json_to_sheet(templateData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Template Siswa");
+                XLSX.writeFile(wb, "Template_Import_Siswa.xlsx");
+            };
+
+            const handleFileChange = (e) => {
+                const file = e.target.files[0];
+                if(!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const wb = XLSX.read(ev.target.result, {type:'array'});
+                        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                        if(json.length){
+                            const newS = json.map((r,i)=>({
+                                id: Date.now() + i + Math.random(), 
+                                name: r['Nama'],
+                                class: r['Kelas'],
+                                examNumber: r['No Ujian'],
+                                roomId: Number(r['ID Ruang (Angka)']) || 0
+                            }));
+                            setStudents(prev => [...prev, ...newS]);
+                            alert(`${newS.length} data siswa berhasil diimpor.`);
+                        }
+                    } catch (error) {
+                        alert('Gagal membaca file. Pastikan format Excel benar.');
+                        console.error(error);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+                e.target.value = '';
+            };
+
             const handleDelete = (id, type) => { if(confirm("Hapus data ini?")) { if(type==='siswa') setStudents(prev=>prev.filter(x=>x.id!==id)); if(type==='guru') setTeachers(prev=>prev.filter(x=>x.id!==id)); if(type==='mapel') setSubjects(prev=>prev.filter(x=>x.id!==id)); if(type==='ruang') setRooms(prev=>prev.filter(x=>x.id!==id)); } };
             const handleSave = (e) => { e.preventDefault(); const id=formData.id||Date.now(); const newData={...formData,id}; if(tab==='siswa') { if(formData.id) setStudents(prev=>prev.map(x=>x.id===id?newData:x)); else setStudents(prev=>[...prev,newData]); } if(tab==='guru') { if(formData.id) setTeachers(prev=>prev.map(x=>x.id===id?newData:x)); else setTeachers(prev=>[...prev,newData]); } if(tab==='mapel') { if(formData.id) setSubjects(prev=>prev.map(x=>x.id===id?newData:x)); else setSubjects(prev=>[...prev,newData]); } if(tab==='ruang') { if(formData.id) setRooms(prev=>prev.map(x=>x.id===id?newData:x)); else setRooms(prev=>[...prev,newData]); } setIsModalOpen(false); setFormData({}); };
             const openEdit = (item) => { setFormData(item); setIsModalOpen(true); };
@@ -386,7 +451,17 @@
                         <div className="flex gap-2 mb-4 overflow-x-auto">
                             {tabs.map(t => <button key={t.id} onClick={()=>setTab(t.id)} className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap ${tab===t.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}><i className={`fas ${t.icon} mr-2`}></i>{t.label}</button>)}
                         </div>
-                        <input type="text" placeholder="Cari data..." className="w-full border p-2 rounded-lg mb-4" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                        <div className="flex flex-col md:flex-row gap-3 mb-4">
+                            <input type="text" placeholder="Cari data..." className="w-full md:w-1/3 border p-2 rounded-lg" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                            {tab === 'siswa' && (
+                                <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
+                                    <button onClick={generateExamNumbers} className="bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-purple-200 transition whitespace-nowrap flex items-center"><i className="fas fa-magic mr-2"></i> Auto No.</button>
+                                    <button onClick={downloadTemplate} className="bg-green-100 text-green-700 border border-green-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-green-200 transition whitespace-nowrap flex items-center"><i className="fas fa-file-excel mr-2"></i> Template</button>
+                                    <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
+                                    <button onClick={() => fileInputRef.current.click()} className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-emerald-200 transition whitespace-nowrap flex items-center"><i className="fas fa-upload mr-2"></i> Import</button>
+                                </div>
+                            )}
+                        </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-50 border-b">
@@ -439,68 +514,544 @@
         };
 
         const ScheduleManager = ({ subjects, rooms, teachers, schedules, setSchedules }) => {
+            const clearSchedule = () => { if(confirm('PERHATIAN: Hapus semua jadwal? \nJadwal yang sudah dikunci (gembok) juga akan ikut terhapus.')) { setSchedules([]); } };
             const generateSchedule = () => {
-                 const newSch = [];
-                 subjects.forEach(sub => {
-                     rooms.forEach((room, i) => {
-                         const teacher = teachers[i % teachers.length];
-                         newSch.push({ id: `${sub.id}-${room.id}`, subjectId: sub.id, roomId: room.id, invigilatorId: teacher.id });
-                     });
-                 });
-                 setSchedules(newSch);
+                const lockedSchedules = schedules.filter(s => s.isLocked);
+                const isSlotLocked = (subId, roomId) => lockedSchedules.some(s => String(s.subjectId) === String(subId) && String(s.roomId) === String(roomId));
+                const newSchedules = [...lockedSchedules];
+                let teacherIndex = 0;
+                subjects.forEach(sub => {
+                    rooms.forEach(room => {
+                        if (!isSlotLocked(sub.id, room.id)) {
+                            const teacher = teachers[teacherIndex % teachers.length];
+                            teacherIndex++;
+                            newSchedules.push({ id: `${sub.id}-${room.id}`, subjectId: sub.id, roomId: room.id, invigilatorId: teacher.id, isLocked: false });
+                        }
+                    });
+                });
+                setSchedules(newSchedules);
+                alert(`Jadwal berhasil digenerate!\n${lockedSchedules.length} jadwal terkunci dipertahankan.`);
             };
+            const handleManualChange = (schId, newTeacherId) => { setSchedules(prev => prev.map(s => s.id === schId ? { ...s, invigilatorId: Number(newTeacherId), isLocked: true } : s)); };
+            const toggleLock = (schId) => { setSchedules(prev => prev.map(s => s.id === schId ? { ...s, isLocked: !s.isLocked } : s)); };
+            const totalSlots = subjects.length * rooms.length;
+            const filledSlots = schedules.length;
+
             return (
-                <div className="space-y-6 animate-fade-in-down">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex justify-between items-center">
-                        <div><h2 className="text-xl font-bold text-gray-800">Manajemen Jadwal</h2><p className="text-gray-500 text-sm">Generate jadwal otomatis berdasarkan ruang & mapel.</p></div>
-                        <button onClick={generateSchedule} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition"><i className="fas fa-magic mr-2"></i> Auto Generate</button>
+                <div className="space-y-8 animate-fade-in-down">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div><h2 className="text-xl font-bold text-gray-800">Manajemen Jadwal</h2><p className="text-gray-500 text-sm">Terisi: <span className="font-bold text-blue-600">{filledSlots}</span> / {totalSlots} Slot. Gunakan <i className="fas fa-lock text-xs mx-1"></i> untuk mengunci posisi pengawas.</p></div>
+                        <div className="flex gap-2">
+                            <button onClick={clearSchedule} className="bg-white text-red-600 border border-red-200 px-4 py-2 rounded-lg font-bold hover:bg-red-50 transition flex items-center shadow-sm text-sm"><i className="fas fa-trash-alt mr-2"></i> Reset Semua</button>
+                            <button onClick={generateSchedule} className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 transition flex items-center shadow-md text-sm"><i className="fas fa-magic mr-2"></i> Auto Generate</button>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {schedules.map((sch, i) => {
-                            const sub = subjects.find(s=>s.id===sch.subjectId);
-                            const room = rooms.find(r=>r.id===sch.roomId);
-                            const teacher = teachers.find(t=>t.id===sch.invigilatorId);
-                            return (
-                                <div key={i} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                                    <div className="font-bold text-gray-800">{sub?.name}</div>
-                                    <div className="text-sm text-gray-500 mb-2">{sub?.date} • {sub?.time}</div>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="bg-gray-100 px-2 py-1 rounded text-gray-600">{room?.name}</span>
-                                        <span className="text-indigo-600 font-medium">{teacher?.name}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    {subjects.length === 0 ? (<div className="p-12 text-center text-gray-400 bg-gray-50 rounded-xl border border-dashed border-gray-300"><i className="fas fa-calendar-times text-4xl mb-3"></i><p>Belum ada mata pelajaran. Silakan tambah di Data Master.</p></div>) : (<div className="space-y-6">{subjects.map(sub => {
+                        const subSchedules = schedules.filter(s => String(s.subjectId) === String(sub.id));
+                        return (
+                            <div key={sub.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center"><div className="font-bold text-gray-700 flex items-center gap-2"><div className="w-8 h-8 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs"><i className="fas fa-book"></i></div> {sub.name} <span className="text-xs font-normal text-gray-500 ml-2 bg-white px-2 py-1 rounded border border-gray-200"><i className="far fa-clock mr-1"></i> {sub.date}, {sub.time}</span></div></div>
+                                <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-white border-b border-gray-100 text-xs uppercase text-gray-500"><tr><th className="px-6 py-3 w-1/4">Ruang Ujian</th><th className="px-6 py-3">Pengawas (Bisa Diubah)</th><th className="px-6 py-3 w-24 text-center">Kunci</th></tr></thead><tbody className="divide-y divide-gray-50">{rooms.map(room => {
+                                    const sch = subSchedules.find(s => String(s.roomId) === String(room.id));
+                                    if (!sch) return (<tr key={room.id}><td className="px-6 py-3 font-medium text-gray-600 pl-6 border-l-4 border-transparent">{room.name}</td><td className="px-6 py-3 text-gray-400 italic">-- Belum dijadwalkan --</td><td className="px-6 py-3 text-center">-</td></tr>);
+                                    return (
+                                        <tr key={sch.id} className={`transition duration-200 ${sch.isLocked ? "bg-amber-50/60" : "hover:bg-gray-50"}`}>
+                                            <td className={`px-6 py-3 font-medium text-gray-700 border-l-4 ${sch.isLocked ? 'border-amber-400' : 'border-transparent'}`}>{room.name}<div className="text-[10px] text-gray-400">Kapasitas: {room.capacity}</div></td>
+                                            <td className="px-6 py-3"><div className="relative"><select className={`appearance-none bg-transparent border-b-2 py-1.5 pr-8 outline-none cursor-pointer transition w-full text-sm ${sch.isLocked ? 'border-amber-400 text-amber-900 font-bold' : 'border-transparent hover:border-gray-300 text-gray-700'}`} value={sch.invigilatorId || ''} onChange={(e) => handleManualChange(sch.id, e.target.value)}><option value="">-- Pilih Pengawas --</option>{teachers.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}</select><div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500"><i className="fas fa-chevron-down text-xs"></i></div></div></td>
+                                            <td className="px-6 py-3 text-center"><button onClick={() => toggleLock(sch.id)} className={`w-9 h-9 rounded-full flex items-center justify-center transition shadow-sm ${sch.isLocked ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-white text-gray-300 hover:text-gray-500 hover:bg-gray-100 border border-gray-200'}`} title={sch.isLocked ? "Terkunci: Aman dari Auto-Generate" : "Klik untuk Mengunci Pengawas"}><i className={`fas ${sch.isLocked ? 'fa-lock' : 'fa-lock-open'}`}></i></button></td>
+                                        </tr>
+                                    );
+                                })}</tbody></table></div>
+                            </div>
+                        );
+                    })}</div>)}
                 </div>
             );
         };
 
         const PrintCenter = ({ schoolInfo, students, rooms, subjects, schedules, teachers }) => {
             const [view, setView] = useState('menu');
+            const [selectedRoom, setSelectedRoom] = useState('all');
+            const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || 0);
+
             const handlePrint = () => window.print();
 
-            if(view === 'menu') return (
-                <div className="animate-fade-in-down">
-                    <h2 className="text-2xl font-bold mb-6">Pusat Cetak</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <DocCard title="Kartu Peserta" desc="Cetak kartu ujian siswa." icon="fa-id-card" color="text-blue-500" onClick={()=>{alert('Fitur preview kartu peserta (Gunakan browser print)');}} />
-                        <DocCard title="Daftar Hadir" desc="Absensi siswa per ruang." icon="fa-clipboard-list" color="text-green-500" onClick={()=>{alert('Fitur preview absensi (Gunakan browser print)');}} />
+            // Helper Components
+            const BackBtn = () => (
+                <div className="no-print mb-4 flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-lg shadow border border-slate-200 sticky top-0 z-50">
+                    <button onClick={() => setView('menu')} className="text-slate-600 hover:text-slate-800 font-bold flex items-center gap-2">
+                        <i className="fas fa-arrow-left"></i> Kembali ke Menu
+                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {(view === 'attendance' || view === 'supervisor' || view === 'ba_naskah' || view === 'ba_ljk') && (
+                            <select className="border border-slate-300 p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={selectedSubject} onChange={e=>setSelectedSubject(Number(e.target.value))}>
+                                {subjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.date})</option>)}
+                            </select>
+                        )}
+                        {(view === 'cards' || view === 'attendance' || view === 'label' || view === 'ba_naskah' || view === 'ba_ljk') && (
+                            <select className="border border-slate-300 p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none" value={selectedRoom} onChange={e=>setSelectedRoom(e.target.value === 'all' ? 'all' : Number(e.target.value))}>
+                                <option value="all">Semua Ruang</option>
+                                {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+                        )}
+                        <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold shadow flex items-center gap-2 transition">
+                            <i className="fas fa-print"></i> Cetak Dokumen
+                        </button>
                     </div>
                 </div>
             );
-            return null; // Simplified for brevity in this fix
+
+            const DocHeader = ({ school, title, subtitle }) => (
+                <div className="text-center pb-2 mb-4 relative">
+                    <div className="flex items-center gap-4 mb-2 justify-center relative">
+                        {school?.logo && <img src={school.logo} alt="Logo" className="w-20 h-20 object-contain absolute left-0" />}
+                        <div className="flex-1 px-20">
+                            <h1 className="text-lg font-bold uppercase leading-tight">{school?.agency || 'PEMERINTAH PROVINSI'}</h1>
+                            <h2 className="text-xl font-bold uppercase text-blue-900 leading-tight mb-1">{school?.name || 'NAMA SEKOLAH'}</h2>
+                            <p className="text-xs italic text-gray-600">{school?.address || 'Alamat Sekolah'}</p>
+                        </div>
+                    </div>
+                    <div className="border-t-2 border-black mt-1 pt-2">
+                        <div className="font-bold text-lg uppercase mb-1">{title}</div>
+                        {subtitle && <div className="font-bold text-md uppercase">{subtitle}</div>}
+                        <div className="text-xs uppercase tracking-wide mt-1">{school?.examName || 'UJIAN'}</div>
+                    </div>
+                </div>
+            );
+
+            // 1. Kartu Peserta
+            const CardLayout = () => {
+                const filteredStudents = selectedRoom === 'all' ? students : students.filter(s => String(s.roomId) === String(selectedRoom));
+                const chunks = [];
+                for (let i = 0; i < filteredStudents.length; i += 8) { chunks.push(filteredStudents.slice(i, i + 8)); }
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {chunks.map((chunk, pageIdx) => (
+                            <div key={pageIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                <div className="card-grid">
+                                    {chunk.map(s => {
+                                        const roomName = rooms.find(r => String(r.id) === String(s.roomId))?.name || '-';
+                                        return (
+                                            <div key={s.id} className="exam-card">
+                                                <div className="ec-header">
+                                                    {schoolInfo.logo ? <img src={schoolInfo.logo} className="ec-logo" /> : <i className="fas fa-university text-3xl text-gray-400"></i>}
+                                                    <div className="ec-title-box">
+                                                        <div className="ec-agency">{schoolInfo.agency}</div>
+                                                        <div className="ec-school">{schoolInfo.name}</div>
+                                                        <div className="ec-exam">{schoolInfo.examName}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="ec-body">
+                                                    <div className="ec-photo-box flex flex-col items-center justify-center bg-white p-1 border-slate-300">
+                                                        <div className="text-[6pt] text-center mt-1 font-bold text-slate-600">FOTO</div>
+                                                    </div>
+                                                    <div className="ec-details">
+                                                        <div>
+                                                            <div className="ec-row"><div className="ec-label">No. Ujian</div><div className="ec-sep">:</div><div className="ec-val mono">{s.examNumber}</div></div>
+                                                            <div className="ec-row"><div className="ec-label">Nama</div><div className="ec-sep">:</div><div className="ec-val uppercase">{s.name}</div></div>
+                                                            <div className="ec-row"><div className="ec-label">Kelas</div><div className="ec-sep">:</div><div className="ec-val">{s.class}</div></div>
+                                                            <div className="ec-row"><div className="ec-label">Ruang</div><div className="ec-sep">:</div><div className="ec-val">{roomName}</div></div>
+                                                        </div>
+                                                        <div className="ec-footer">
+                                                            <div className="ec-signature" style={{ width: '140px', textAlign: 'center' }}>
+                                                                <div style={{ marginBottom: '2px' }}>Jakarta, {new Date().toLocaleDateString('id-ID')}</div>
+                                                                <div style={{ fontWeight: 'bold' }}>Kepala Sekolah</div>
+                                                                <div className="ec-sign-space">
+                                                                    {schoolInfo.signature && <img src={schoolInfo.signature} className="ec-sign-img" alt="TTD" />}
+                                                                    {schoolInfo.stamp && <img src={schoolInfo.stamp} className="ec-stamp-img" alt="Cap" />}
+                                                                </div>
+                                                                <div className="ec-kepsek">{schoolInfo.headmaster}</div>
+                                                                <div style={{ fontSize: '6pt' }}>NIP. {schoolInfo.headmasterNip}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
+            // 2. Daftar Hadir (Attendance)
+            const AttendanceLayout = () => {
+                const targetRooms = selectedRoom === 'all' ? rooms : rooms.filter(r => String(r.id) === String(selectedRoom));
+                const activeSubject = subjects.find(s => String(s.id) === String(selectedSubject)) || subjects[0];
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {targetRooms.map(room => {
+                            const roomStudents = students.filter(s => String(s.roomId) === String(room.id));
+                            const schedule = schedules.find(s => String(s.subjectId) === String(activeSubject.id) && String(s.roomId) === String(room.id));
+                            const t1 = teachers.find(t => String(t.id) === String(schedule?.invigilatorId));
+                            return (
+                                <div key={room.id} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                    <DocHeader school={schoolInfo} title="DAFTAR HADIR PESERTA" subtitle={`RUANG: ${room.name}`} />
+                                    <div className="flex justify-between text-sm mb-4 border-b border-black pb-2">
+                                        <div><table><tbody><tr><td className="font-bold pr-4">Mata Pelajaran</td><td>: {activeSubject.name}</td></tr><tr><td className="font-bold pr-4">Hari / Tanggal</td><td>: {activeSubject.date}</td></tr></tbody></table></div>
+                                        <div><table><tbody><tr><td className="font-bold pr-4">Waktu</td><td>: {activeSubject.time}</td></tr><tr><td className="font-bold pr-4">Jml Peserta</td><td>: {roomStudents.length} Org</td></tr></tbody></table></div>
+                                    </div>
+                                    <table className="doc-table">
+                                        <thead><tr><th className="w-10">No</th><th className="w-32">No. Ujian</th><th>Nama Peserta</th><th className="w-32">Tanda Tangan</th><th className="w-16">Ket</th></tr></thead>
+                                        <tbody>
+                                            {roomStudents.map((s, idx) => (<tr key={s.id}><td className="text-center">{idx + 1}</td><td className="text-center font-mono">{s.examNumber}</td><td className="uppercase">{s.name}</td><td className="text-left text-xs text-gray-400 align-bottom h-8">{idx % 2 === 0 ? `${idx + 1}..........` : `..........${idx + 1}`}</td><td></td></tr>))}
+                                            {Array.from({length: Math.max(0, 20 - roomStudents.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-8"></td><td></td><td></td><td></td><td></td></tr>))}
+                                        </tbody>
+                                    </table>
+                                    <div className="mt-8 flex justify-end text-sm"><div className="signature-box text-center w-64"><div className="mb-8"><div>Pengawas Ruang,</div></div><div className="font-bold underline mt-16">{t1?.name || '....................................'}</div><div>NIP. {t1?.nip || '-'}</div></div></div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            };
+
+            // 3. Label Meja
+            const DeskLabelLayout = () => {
+                const filteredStudents = selectedRoom === 'all' ? students : students.filter(s => String(s.roomId) === String(selectedRoom));
+                const chunks = []; for (let i = 0; i < filteredStudents.length; i += 4) { chunks.push(filteredStudents.slice(i, i + 4)); }
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {chunks.map((chunk, pIdx) => (
+                            <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                <div className="desk-label-grid">
+                                    {chunk.map(s => (
+                                        <div key={s.id} className="desk-label-card">
+                                            <div className="text-xl font-bold uppercase mb-2">{schoolInfo.examName}</div>
+                                            <div className="text-6xl font-black font-mono my-2 tracking-widest">{s.examNumber.split('-').pop()}</div>
+                                            <div className="w-full border-t-2 border-black my-4"></div>
+                                            <div className="text-xl font-bold uppercase">{s.name}</div>
+                                            <div className="text-lg text-gray-600 mt-1">{s.class}</div>
+                                            <div className="mt-auto text-sm bg-black text-white px-6 py-1 rounded-full font-mono">{s.examNumber}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
+            // 4. Daftar Pengawas (Absensi manual)
+            const SupervisorListLayout = () => {
+                const activeSubject = subjects.find(s => String(s.id) === String(selectedSubject)) || subjects[0];
+                const relevantSchedules = schedules.filter(s => String(s.subjectId) === String(activeSubject?.id));
+                const scheduledTeachers = relevantSchedules.map(sch => {
+                    const teacher = teachers.find(t => String(t.id) === String(sch.invigilatorId));
+                    const room = rooms.find(r => String(r.id) === String(sch.roomId));
+                    return { ...teacher, roomName: room?.name };
+                }).filter(t => t.id).sort((a, b) => (a.roomName || '').localeCompare(b.roomName || ''));
+                const chunks = []; for (let i = 0; i < scheduledTeachers.length; i += 20) { chunks.push(scheduledTeachers.slice(i, i + 20)); }
+                if (scheduledTeachers.length === 0) return <div className="bg-gray-200 p-4 min-h-screen flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow text-center"><i className="fas fa-info-circle text-4xl text-blue-500 mb-2"></i><p className="text-gray-600 font-bold mb-2">Belum ada pengawas terjadwal untuk mapel ini.</p><p className="text-sm text-gray-500">Silakan generate jadwal atau pilih mapel lain.</p><button onClick={() => setView('menu')} className="mt-4 text-blue-600 underline">Kembali</button></div></div>;
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {chunks.map((chunk, pIdx) => (
+                            <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                <DocHeader school={schoolInfo} title="DAFTAR HADIR PENGAWAS" />
+                                <div className="mb-6 text-sm"> <table className="w-full"><tbody><tr><td className="font-bold w-32">Hari / Tanggal</td><td>: {activeSubject?.date || '-'}</td></tr><tr><td className="font-bold w-32">Mata Pelajaran</td><td>: {activeSubject?.name || '-'}</td></tr><tr><td className="font-bold w-32">Waktu</td><td>: {activeSubject?.time || '-'}</td></tr></tbody></table> </div>
+                                <table className="doc-table"><thead><tr><th className="w-10 py-3">No</th><th className="py-3">Nama Pengawas</th><th className="w-32 py-3">NIP</th><th className="w-32 py-3">Ruang</th><th className="w-40 py-3">Tanda Tangan</th></tr></thead><tbody>{chunk.map((t, idx) => (<tr key={idx}><td className="text-center py-3">{idx + 1 + (pIdx * 20)}</td><td className="font-bold px-3 py-3 uppercase">{t.name}</td><td className="text-center py-3">{t.nip}</td><td className="text-center py-3">{t.roomName || '-'}</td><td className="text-left px-2 text-xs text-gray-400 align-bottom h-12">{(idx + 1 + (pIdx * 20)) % 2 === 1 ? `${idx + 1 + (pIdx * 20)}..........` : `..........${idx + 1 + (pIdx * 20)}`}</td></tr>))}{Array.from({length: Math.max(0, 15 - chunk.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-12"></td><td></td><td></td><td></td><td></td></tr>))}</tbody></table>
+                                <div className="mt-12 flex justify-end text-sm"> <div className="signature-box text-center w-64"> <div className="mb-2"><div>Kepala Sekolah,</div></div> <div className="ec-sign-space" style={{height: '60px'}}> {schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />} {schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />} </div> <div className="font-bold underline mt-2">{schoolInfo.headmaster}</div> <div>NIP. {schoolInfo.headmasterNip}</div> </div> </div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
+            // 5. Jadwal Pengawasan (Recap)
+            const SupervisorScheduleLayout = () => {
+                const fullSchedules = schedules.map(sch => {
+                    const sub = subjects.find(s => String(s.id) === String(sch.subjectId));
+                    const room = rooms.find(r => String(r.id) === String(sch.roomId));
+                    const teacher = teachers.find(t => String(t.id) === String(sch.invigilatorId));
+                    return { ...sch, sub, room, teacher };
+                }).sort((a, b) => {
+                    if (a.sub?.date !== b.sub?.date) return (a.sub?.date || '').localeCompare(b.sub?.date || '');
+                    return (a.sub?.time || '').localeCompare(b.sub?.time || '');
+                });
+                const ITEMS_PER_PAGE = 18;
+                const chunks = []; for (let i = 0; i < fullSchedules.length; i += ITEMS_PER_PAGE) { chunks.push(fullSchedules.slice(i, i + ITEMS_PER_PAGE)); }
+                if (fullSchedules.length === 0) return <div className="bg-gray-200 p-4 min-h-screen flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow text-center"><i className="fas fa-exclamation-circle text-4xl text-yellow-500 mb-2"></i><p className="text-gray-600 font-bold">Belum ada jadwal yang di-generate.</p><button onClick={() => setView('menu')} className="mt-4 text-blue-600 underline">Kembali</button></div></div>;
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {chunks.map((chunk, pIdx) => (
+                            <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                <DocHeader school={schoolInfo} title="JADWAL TUGAS PENGAWASAN" />
+                                <table className="doc-table"><thead><tr><th className="w-10">No</th><th className="w-32">Hari / Tanggal</th><th className="w-32">Waktu</th><th>Mata Pelajaran</th><th className="w-32">Ruang</th><th className="w-64">Nama Pengawas</th></tr></thead><tbody>{chunk.map((item, idx) => (<tr key={item.id}><td className="text-center">{idx + 1 + (pIdx * ITEMS_PER_PAGE)}</td><td className="text-center">{item.sub?.date}</td><td className="text-center">{item.sub?.time}</td><td className="px-2 font-semibold">{item.sub?.name}</td><td className="text-center">{item.room?.name}</td><td className="px-2 uppercase">{item.teacher?.name || '-'}</td></tr>))}{Array.from({length: Math.max(0, ITEMS_PER_PAGE - chunk.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-8"></td><td></td><td></td><td></td><td></td><td></td></tr>))}</tbody></table>
+                                {pIdx === chunks.length - 1 && (<div className="mt-8 flex justify-end text-sm"><div className="signature-box text-center w-64"><div className="mb-2"><div>Kepala Sekolah,</div></div><div className="ec-sign-space" style={{height: '60px'}}>{schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />}{schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />}</div><div className="font-bold underline mt-2">{schoolInfo.headmaster}</div><div>NIP. {schoolInfo.headmasterNip}</div></div></div>)}
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
+            // 6. BA Serah Terima Naskah
+            const HandoverScriptLayout = () => {
+                const targetRooms = selectedRoom === 'all' ? rooms : rooms.filter(r => String(r.id) === String(selectedRoom));
+                const activeSubject = subjects.find(s => String(s.id) === String(selectedSubject)) || subjects[0];
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {targetRooms.map(room => {
+                            const schedule = schedules.find(s => String(s.subjectId) === String(activeSubject.id) && String(s.roomId) === String(room.id));
+                            const teacher = teachers.find(t => String(t.id) === String(schedule?.invigilatorId));
+                            const studentCount = students.filter(s => String(s.roomId) === String(room.id)).length;
+                            return (
+                                <div key={room.id} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                    <DocHeader school={schoolInfo} title="BERITA ACARA" subtitle="SERAH TERIMA NASKAH SOAL UJIAN" />
+                                    <div className="text-justify leading-relaxed mb-6">
+                                        <p>Pada hari ini <b>....................</b> tanggal <b>{activeSubject.date}</b>, telah diserahterimakan naskah soal ujian:</p>
+                                        <table className="w-full mt-4 mb-4">
+                                            <tbody>
+                                                <tr><td className="w-40 py-1">Mata Pelajaran</td><td className="font-bold">: {activeSubject.name}</td></tr>
+                                                <tr><td className="w-40 py-1">Ruang</td><td className="font-bold">: {room.name}</td></tr>
+                                                <tr><td className="w-40 py-1">Jumlah Amplop</td><td>: 1 (Satu) Amplop Tertutup</td></tr>
+                                                <tr><td className="w-40 py-1">Jumlah Eksemplar</td><td>: {studentCount} Eksemplar + Cadangan</td></tr>
+                                            </tbody>
+                                        </table>
+                                        <p>Naskah soal tersebut diserahkan dalam keadaan baik dan tersegel. Demikian berita acara ini dibuat untuk dapat dipergunakan sebagaimana mestinya.</p>
+                                    </div>
+                                    <div className="signature-grid mt-16">
+                                        <div className="signature-box">
+                                            <div className="mb-16">Yang Menyerahkan<br/>(Panitia Ujian)</div>
+                                            <div className="font-bold underline">( ............................................ )</div>
+                                        </div>
+                                        <div className="signature-box">
+                                            <div className="mb-16">Yang Menerima<br/>(Pengawas Ruang)</div>
+                                            <div className="font-bold underline">{teacher?.name || '( ............................................ )'}</div>
+                                            <div>NIP. {teacher?.nip || '-'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            };
+
+            // 7. BA Serah Terima LJK
+            const HandoverAnswerLayout = () => {
+                const targetRooms = selectedRoom === 'all' ? rooms : rooms.filter(r => String(r.id) === String(selectedRoom));
+                const activeSubject = subjects.find(s => String(s.id) === String(selectedSubject)) || subjects[0];
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {targetRooms.map(room => {
+                            const schedule = schedules.find(s => String(s.subjectId) === String(activeSubject.id) && String(s.roomId) === String(room.id));
+                            const teacher = teachers.find(t => String(t.id) === String(schedule?.invigilatorId));
+                            const studentCount = students.filter(s => String(s.roomId) === String(room.id)).length;
+                            return (
+                                <div key={room.id} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                    <DocHeader school={schoolInfo} title="BERITA ACARA" subtitle="SERAH TERIMA LEMBAR JAWABAN UJIAN" />
+                                    <div className="text-justify leading-relaxed mb-6">
+                                        <p>Pada hari ini <b>....................</b> tanggal <b>{activeSubject.date}</b>, telah diserahterimakan Lembar Jawaban Ujian (LJK) dari Pengawas Ruang kepada Panitia/Guru Mata Pelajaran:</p>
+                                        <table className="w-full mt-4 mb-4">
+                                            <tbody>
+                                                <tr><td className="w-48 py-1">Mata Pelajaran</td><td className="font-bold">: {activeSubject.name}</td></tr>
+                                                <tr><td className="w-48 py-1">Ruang</td><td className="font-bold">: {room.name}</td></tr>
+                                                <tr><td className="w-48 py-1">Jml Peserta Terdaftar</td><td>: {studentCount} Orang</td></tr>
+                                                <tr><td className="w-48 py-1">Jml Peserta Hadir</td><td>: ....... Orang</td></tr>
+                                                <tr><td className="w-48 py-1">Jml LJK Diserahkan</td><td>: ....... Lembar</td></tr>
+                                                <tr><td className="w-48 py-1">Berita Acara & Absensi</td><td>: Lengkap / Tidak Lengkap *)</td></tr>
+                                            </tbody>
+                                        </table>
+                                        <p>Demikian berita acara serah terima ini dibuat dengan sebenar-benarnya.</p>
+                                    </div>
+                                    <div className="signature-grid mt-16">
+                                        <div className="signature-box">
+                                            <div className="mb-16">Yang Menyerahkan<br/>(Pengawas Ruang)</div>
+                                            <div className="font-bold underline">{teacher?.name || '( ............................................ )'}</div>
+                                            <div>NIP. {teacher?.nip || '-'}</div>
+                                        </div>
+                                        <div className="signature-box">
+                                            <div className="mb-16">Yang Menerima<br/>(Panitia / Guru Mapel)</div>
+                                            <div className="font-bold underline">( ............................................ )</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            };
+
+            // Main Render Switch
+            if (view === 'cards') return <CardLayout />;
+            if (view === 'attendance') return <AttendanceLayout />;
+            if (view === 'label') return <DeskLabelLayout />;
+            if (view === 'supervisor') return <SupervisorListLayout />;
+            if (view === 'supervisor_schedule') return <SupervisorScheduleLayout />;
+            if (view === 'ba_naskah') return <HandoverScriptLayout />;
+            if (view === 'ba_ljk') return <HandoverAnswerLayout />;
+
+            return (
+                <div className="animate-fade-in-down">
+                    <h2 className="text-3xl font-bold text-gray-800 mb-2">Pusat Cetak</h2>
+                    <p className="text-gray-500 mb-8">Pilih jenis dokumen yang ingin dicetak.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <DocCard title="Kartu Peserta" desc="Cetak kartu identitas ujian untuk semua siswa." icon="fa-id-card" color="text-blue-500" onClick={() => setView('cards')} />
+                        <DocCard title="Daftar Hadir Siswa" desc="Lembar absensi tanda tangan peserta per ruang." icon="fa-clipboard-list" color="text-green-500" onClick={() => setView('attendance')} />
+                        <DocCard title="Label Meja" desc="Nomor peserta ukuran besar untuk ditempel di meja." icon="fa-tag" color="text-orange-500" onClick={() => setView('label')} />
+                        <DocCard title="Absensi Pengawas" desc="Lembar kehadiran manual untuk semua pengawas." icon="fa-user-clock" color="text-teal-600" onClick={() => setView('supervisor')} />
+                        <DocCard title="Jadwal Pengawas" desc="Rekapitulasi jadwal tugas mengawas yang telah digenerate." icon="fa-calendar-day" color="text-indigo-600" onClick={() => setView('supervisor_schedule')} />
+                        <DocCard title="BA Serah Terima Naskah" desc="Dokumen serah terima soal dari panitia ke pengawas." icon="fa-file-import" color="text-rose-600" onClick={() => setView('ba_naskah')} />
+                        <DocCard title="BA Serah Terima LJK" desc="Dokumen serah terima jawaban dari pengawas ke panitia." icon="fa-file-export" color="text-purple-600" onClick={() => setView('ba_ljk')} />
+                    </div>
+                </div>
+            );
         };
 
         const Settings = ({ info, setInfo }) => {
+            const [toast, setToast] = useState(null);
+            
+            useEffect(() => { 
+                if (toast) { 
+                    const timer = setTimeout(() => setToast(null), 3000); 
+                    return () => clearTimeout(timer); 
+                } 
+            }, [toast]);
+
             const handleChange = (e) => setInfo({...info, [e.target.name]: e.target.value});
+            
+            const handleImageUpload = (e, field) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        setInfo(prev => ({ ...prev, [field]: ev.target.result }));
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const handleSave = () => {
+                // Di sistem nyata ini akan save ke Firebase via useFirestoreState otomatis
+                // Kita cuma kasih feedback UI aja
+                setToast({ type: 'success', message: 'Konfigurasi tersimpan ke Cloud.' });
+            };
+
+            const handleReset = () => {
+                if(confirm("PERINGATAN KERAS:\nSemua data (Siswa, Guru, Jadwal, Laporan) akan dihapus permanen dari Cloud Database dan tidak bisa dikembalikan.\n\nKetik 'RESET' untuk melanjutkan.")) {
+                    // Logic reset sesungguhnya ada di level App/Firebase, 
+                    // disini kita simulasikan alert saja untuk keamanan demo
+                    alert("Untuk keamanan demo, fitur Wipe All Data dinonaktifkan di menu ini. Silakan hapus manual per bagian di Data Master.");
+                }
+            };
+
             return (
-                <div className="animate-fade-in-down max-w-2xl bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-                    <h2 className="text-2xl font-bold mb-6">Pengaturan Sekolah</h2>
-                    <div className="space-y-4">
-                        <div><label className="block text-sm font-bold mb-1">Nama Sekolah</label><input className="w-full border p-2 rounded" name="name" value={info.name} onChange={handleChange} /></div>
-                        <div><label className="block text-sm font-bold mb-1">Kepala Sekolah</label><input className="w-full border p-2 rounded" name="headmaster" value={info.headmaster} onChange={handleChange} /></div>
-                        <div><label className="block text-sm font-bold mb-1">Password Admin</label><input className="w-full border p-2 rounded" name="adminPassword" value={info.adminPassword} onChange={handleChange} /></div>
+                <div className="animate-fade-in-down max-w-4xl">
+                    {toast && (
+                        <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 text-white transform transition-all duration-300 animate-fade-in-down border-l-4 border-white/20 backdrop-blur-sm ${toast.type === 'success' ? 'bg-emerald-600/95' : 'bg-rose-600/95'}`}>
+                            <div className="bg-white/20 w-8 h-8 rounded-full flex items-center justify-center"><i className={`fas ${toast.type === 'success' ? 'fa-check' : 'fa-exclamation'} text-sm`}></i></div>
+                            <div><h4 className="font-bold text-sm tracking-wide">{toast.type === 'success' ? 'BERHASIL' : 'GAGAL'}</h4><p className="text-xs opacity-90">{toast.message}</p></div>
+                            <button onClick={() => setToast(null)} className="ml-2 opacity-70 hover:opacity-100 hover:rotate-90 transition-transform"><i className="fas fa-times"></i></button>
+                        </div>
+                    )}
+
+                    <h2 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <i className="fas fa-cog text-gray-400"></i> Pengaturan Sekolah
+                    </h2>
+                    
+                    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Identitas Instansi */}
+                            <div className="md:col-span-2 pb-4 border-b border-gray-100 mb-2">
+                                <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center"><i className="fas fa-building text-blue-500 mr-2"></i> Identitas Instansi</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nama Instansi / Dinas</label>
+                                        <input name="agency" value={info.agency || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50 focus:bg-white" placeholder="DINAS PENDIDIKAN..." />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nama Sekolah</label>
+                                        <input name="name" value={info.name || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50 focus:bg-white" />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Alamat Lengkap</label>
+                                        <input name="address" value={info.address || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-gray-50 focus:bg-white" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Detail Ujian */}
+                            <div className="md:col-span-2 pb-4 border-b border-gray-100 mb-2">
+                                <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center"><i className="fas fa-file-alt text-purple-500 mr-2"></i> Detail Ujian</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Nama Ujian (Kop Surat)</label>
+                                        <input name="examName" value={info.examName || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Tahun Ajaran</label>
+                                        <input name="year" value={info.year || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Pejabat */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Kepala Sekolah</label>
+                                <input name="headmaster" value={info.headmaster || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">NIP Kepala Sekolah</label>
+                                <input name="headmasterNip" value={info.headmasterNip || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition" />
+                            </div>
+
+                            {/* Keamanan */}
+                            <div className="md:col-span-2 mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+                                <h3 className="font-bold text-yellow-800 mb-4 flex items-center"><i className="fas fa-shield-alt mr-2"></i> Keamanan Akses</h3>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Password Admin</label>
+                                    <div className="relative">
+                                        <i className="fas fa-lock absolute left-3 top-3.5 text-gray-400"></i>
+                                        <input type="text" name="adminPassword" value={info.adminPassword || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 pl-10 rounded-lg bg-white focus:ring-2 focus:ring-yellow-500 outline-none transition" placeholder="Masukkan password baru..." />
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2 italic"><i className="fas fa-info-circle mr-1"></i> Default password adalah "admin". Segera ganti untuk keamanan sistem.</p>
+                                </div>
+                            </div>
+
+                            {/* Upload Assets */}
+                            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6 mt-6 pt-6 border-t border-gray-200">
+                                <div className="text-center group">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Logo Sekolah</label>
+                                    <div className="relative w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden group-hover:border-blue-400 transition cursor-pointer">
+                                        {info.logo ? <img src={info.logo} className="h-full object-contain p-2" /> : <div className="text-gray-400"><i className="fas fa-image text-2xl mb-2"></i><div className="text-xs">Upload Logo</div></div>}
+                                        <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logo')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                    </div>
+                                </div>
+                                <div className="text-center group">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Tanda Tangan KS</label>
+                                    <div className="relative w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden group-hover:border-blue-400 transition cursor-pointer">
+                                        {info.signature ? <img src={info.signature} className="h-full object-contain p-2" /> : <div className="text-gray-400"><i className="fas fa-signature text-2xl mb-2"></i><div className="text-xs">Upload TTD</div></div>}
+                                        <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'signature')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                    </div>
+                                </div>
+                                <div className="text-center group">
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Cap Sekolah</label>
+                                    <div className="relative w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden group-hover:border-blue-400 transition cursor-pointer">
+                                        {info.stamp ? <img src={info.stamp} className="h-full object-contain p-2" /> : <div className="text-gray-400"><i className="fas fa-stamp text-2xl mb-2"></i><div className="text-xs">Upload Cap</div></div>}
+                                        <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'stamp')} className="absolute inset-0 opacity-0 cursor-pointer" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="mt-10 flex flex-col md:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200">
+                            <button onClick={handleReset} className="text-red-500 hover:text-red-700 font-bold text-sm px-4 py-2 rounded-lg hover:bg-red-50 transition flex items-center">
+                                <i className="fas fa-trash-alt mr-2"></i> Reset Data Aplikasi
+                            </button>
+                            <button onClick={handleSave} className="w-full md:w-auto bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-800 transition transform active:scale-95 flex items-center justify-center">
+                                <i className="fas fa-save mr-2"></i> Simpan Pengaturan
+                            </button>
+                        </div>
                     </div>
                 </div>
             );
@@ -584,14 +1135,8 @@
             const roomStats = rooms.map(room => {
                 const roomStudents = students.filter(s => String(s.roomId) === String(room.id));
                 const total = roomStudents.length;
-                
-                // Cari jadwal yang terhubung ke ruangan ini
                 const roomSchedules = schedules.filter(s => String(s.roomId) === String(room.id));
-                
-                // Cari siswa yang absen (Sakit, Izin, Alpha) di ruangan ini (kumulatif dari semua sesi yang tercatat)
-                // Kita gunakan Set untuk memastikan 1 siswa hanya dihitung 1x meskipun absen di beberapa mapel
                 const uniqueAbsentStudents = new Set();
-                
                 roomSchedules.forEach(sch => {
                     const key = `${sch.subjectId}-${sch.roomId}`;
                     const log = attendance[key] || {};
@@ -601,18 +1146,11 @@
                         }
                     });
                 });
-
                 const absentList = Array.from(uniqueAbsentStudents).map(id => {
                     const st = students.find(s => String(s.id) === String(id));
                     return st ? st.name : `ID: ${id}`;
                 });
-
-                return {
-                    ...room,
-                    total,
-                    absentCount: uniqueAbsentStudents.size,
-                    absentList
-                };
+                return { ...room, total, absentCount: uniqueAbsentStudents.size, absentList };
             });
 
             return ( 
@@ -621,15 +1159,12 @@
                         <div><h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2><p className="text-slate-500 mt-1">Pantau aktivitas asesmen secara real-time (Online Mode).</p></div> 
                         <div className="text-right"><div className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-1">{date.toLocaleDateString('id-ID', dateOptions)}</div><p className="text-xs text-slate-400">Semester Ganjil 2023/2024</p></div> 
                     </div> 
-                    
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"> 
                         <StatCard title="Total Peserta" value={stats.s || 0} icon="fa-user-graduate" color="text-blue-600" /> 
                         <StatCard title="Pengawas" value={stats.t || 0} icon="fa-chalkboard-teacher" color="text-emerald-600" /> 
                         <StatCard title="Mapel Ujian" value={stats.m || 0} icon="fa-book" color="text-violet-600" /> 
                         <StatCard title="Ruang Ujian" value={stats.r || 0} icon="fa-door-open" color="text-orange-600" /> 
                     </div> 
-
-                    {/* NEW SECTION: MONITORING RUANG */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                         <div className="flex justify-between items-center mb-6">
                             <div className="flex items-center gap-2">
@@ -637,102 +1172,25 @@
                                 <h3 className="font-bold text-slate-700 text-lg">Monitoring Kehadiran Per Ruang</h3>
                             </div>
                             <div className="flex bg-slate-100 p-1 rounded-lg">
-                                <button 
-                                    onClick={() => setViewMode('grid')} 
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    <i className="fas fa-th-large mr-1"></i> Kartu
-                                </button>
-                                <button 
-                                    onClick={() => setViewMode('table')} 
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    <i className="fas fa-list mr-1"></i> Tabel
-                                </button>
+                                <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><i className="fas fa-th-large mr-1"></i> Kartu</button>
+                                <button onClick={() => setViewMode('table')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><i className="fas fa-list mr-1"></i> Tabel</button>
                             </div>
                         </div>
-
                         {viewMode === 'grid' ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {roomStats.map(r => (
                                     <div key={r.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 hover:bg-white hover:shadow-md transition duration-300">
-                                        <div className="flex justify-between items-start mb-3 border-b border-slate-200 pb-3">
-                                            <div>
-                                                <div className="font-bold text-slate-800 text-lg">{r.name}</div>
-                                                <div className="text-xs text-slate-500">Kapasitas: {r.capacity} Kursi</div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Siswa</div>
-                                                <div className="text-xl font-black text-slate-700">{r.total}</div>
-                                            </div>
-                                        </div>
-                                        
+                                        <div className="flex justify-between items-start mb-3 border-b border-slate-200 pb-3"><div><div className="font-bold text-slate-800 text-lg">{r.name}</div><div className="text-xs text-slate-500">Kapasitas: {r.capacity} Kursi</div></div><div className="text-right"><div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Siswa</div><div className="text-xl font-black text-slate-700">{r.total}</div></div></div>
                                         <div className="bg-white rounded-lg p-3 border border-slate-100">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="text-xs font-bold text-rose-600 uppercase tracking-wide">Tidak Hadir</span>
-                                                <span className={`text-lg font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>
-                                                    {r.absentCount} <span className="text-xs font-normal text-slate-400">Siswa</span>
-                                                </span>
-                                            </div>
-                                            
-                                            {r.absentCount > 0 ? (
-                                                <div className="mt-2 space-y-1 max-h-24 overflow-y-auto custom-scrollbar">
-                                                    {r.absentList.map((name, i) => (
-                                                        <div key={i} className="text-xs text-slate-600 bg-rose-50 px-2 py-1 rounded border border-rose-100 flex items-center gap-2">
-                                                            <i className="fas fa-times-circle text-rose-400 text-[10px]"></i>
-                                                            <span className="truncate">{name}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="text-xs text-emerald-600 bg-emerald-50 px-2 py-2 rounded border border-emerald-100 text-center font-medium">
-                                                    <i className="fas fa-check-circle mr-1"></i> Semua Hadir / Belum Absen
-                                                </div>
-                                            )}
+                                            <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-rose-600 uppercase tracking-wide">Tidak Hadir</span><span className={`text-lg font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>{r.absentCount} <span className="text-xs font-normal text-slate-400">Siswa</span></span></div>
+                                            {r.absentCount > 0 ? (<div className="mt-2 space-y-1 max-h-24 overflow-y-auto custom-scrollbar">{r.absentList.map((name, i) => (<div key={i} className="text-xs text-slate-600 bg-rose-50 px-2 py-1 rounded border border-rose-100 flex items-center gap-2"><i className="fas fa-times-circle text-rose-400 text-[10px]"></i><span className="truncate">{name}</span></div>))}</div>) : (<div className="text-xs text-emerald-600 bg-emerald-50 px-2 py-2 rounded border border-emerald-100 text-center font-medium"><i className="fas fa-check-circle mr-1"></i> Semua Hadir / Belum Absen</div>)}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
                             <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b border-slate-200">
-                                        <tr>
-                                            <th className="px-4 py-3">Nama Ruang</th>
-                                            <th className="px-4 py-3 text-center">Kapasitas</th>
-                                            <th className="px-4 py-3 text-center">Total Siswa</th>
-                                            <th className="px-4 py-3 text-center">Hadir</th>
-                                            <th className="px-4 py-3 text-center">Tidak Hadir</th>
-                                            <th className="px-4 py-3 w-1/3">Detail Ketidakhadiran</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 bg-white">
-                                        {roomStats.map(r => (
-                                            <tr key={r.id} className="hover:bg-slate-50">
-                                                <td className="px-4 py-3 font-bold text-slate-700">{r.name}</td>
-                                                <td className="px-4 py-3 text-center text-slate-500">{r.capacity}</td>
-                                                <td className="px-4 py-3 text-center font-bold">{r.total}</td>
-                                                <td className="px-4 py-3 text-center text-emerald-600 font-bold">{r.total - r.absentCount}</td>
-                                                <td className={`px-4 py-3 text-center font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
-                                                    {r.absentCount}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {r.absentCount > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {r.absentList.map((name, i) => (
-                                                                <span key={i} className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded border border-rose-100 truncate max-w-[150px]" title={name}>
-                                                                    {name}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-emerald-500 italic"><i className="fas fa-check mr-1"></i> Lengkap</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                <table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b border-slate-200"><tr><th className="px-4 py-3">Nama Ruang</th><th className="px-4 py-3 text-center">Kapasitas</th><th className="px-4 py-3 text-center">Total Siswa</th><th className="px-4 py-3 text-center">Hadir</th><th className="px-4 py-3 text-center">Tidak Hadir</th><th className="px-4 py-3 w-1/3">Detail Ketidakhadiran</th></tr></thead><tbody className="divide-y divide-slate-100 bg-white">{roomStats.map(r => (<tr key={r.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-bold text-slate-700">{r.name}</td><td className="px-4 py-3 text-center text-slate-500">{r.capacity}</td><td className="px-4 py-3 text-center font-bold">{r.total}</td><td className="px-4 py-3 text-center text-emerald-600 font-bold">{r.total - r.absentCount}</td><td className={`px-4 py-3 text-center font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-slate-300'}`}>{r.absentCount}</td><td className="px-4 py-3">{r.absentCount > 0 ? (<div className="flex flex-wrap gap-1">{r.absentList.map((name, i) => (<span key={i} className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded border border-rose-100 truncate max-w-[150px]" title={name}>{name}</span>))}</div>) : (<span className="text-xs text-emerald-500 italic"><i className="fas fa-check mr-1"></i> Lengkap</span>)}</td></tr>))}</tbody></table>
                             </div>
                         )}
                     </div>
