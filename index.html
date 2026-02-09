@@ -569,7 +569,7 @@
             );
         };
 
-        const PrintCenter = ({ schoolInfo, students, rooms, subjects, schedules, teachers }) => {
+        const PrintCenter = ({ schoolInfo, students, rooms, subjects, schedules, teachers, supervisorAttendance }) => {
             const [view, setView] = useState('menu');
             const [selectedRoom, setSelectedRoom] = useState('all');
             const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || 0);
@@ -737,14 +737,15 @@
                 );
             };
 
-            // 4. Daftar Pengawas (Absensi manual)
+            // 4. Laporan Kehadiran Pengawas (Real-time Report)
             const SupervisorListLayout = () => {
                 const activeSubject = subjects.find(s => String(s.id) === String(selectedSubject)) || subjects[0];
                 const relevantSchedules = schedules.filter(s => String(s.subjectId) === String(activeSubject?.id));
                 const scheduledTeachers = relevantSchedules.map(sch => {
                     const teacher = teachers.find(t => String(t.id) === String(sch.invigilatorId));
                     const room = rooms.find(r => String(r.id) === String(sch.roomId));
-                    return { ...teacher, roomName: room?.name };
+                    const checkInTime = supervisorAttendance ? supervisorAttendance[sch.id] : null;
+                    return { ...teacher, roomName: room?.name, checkInTime };
                 }).filter(t => t.id).sort((a, b) => (a.roomName || '').localeCompare(b.roomName || ''));
                 const chunks = []; for (let i = 0; i < scheduledTeachers.length; i += 20) { chunks.push(scheduledTeachers.slice(i, i + 20)); }
                 if (scheduledTeachers.length === 0) return <div className="bg-gray-200 p-4 min-h-screen flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow text-center"><i className="fas fa-info-circle text-4xl text-blue-500 mb-2"></i><p className="text-gray-600 font-bold mb-2">Belum ada pengawas terjadwal untuk mapel ini.</p><p className="text-sm text-gray-500">Silakan generate jadwal atau pilih mapel lain.</p><button onClick={() => setView('menu')} className="mt-4 text-blue-600 underline">Kembali</button></div></div>;
@@ -753,9 +754,9 @@
                         <BackBtn />
                         {chunks.map((chunk, pIdx) => (
                             <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
-                                <DocHeader school={schoolInfo} title="DAFTAR HADIR PENGAWAS" />
+                                <DocHeader school={schoolInfo} title="LAPORAN HASIL CHECK-IN PENGAWAS" />
                                 <div className="mb-6 text-sm"> <table className="w-full"><tbody><tr><td className="font-bold w-32">Hari / Tanggal</td><td>: {activeSubject?.date || '-'}</td></tr><tr><td className="font-bold w-32">Mata Pelajaran</td><td>: {activeSubject?.name || '-'}</td></tr><tr><td className="font-bold w-32">Waktu</td><td>: {activeSubject?.time || '-'}</td></tr></tbody></table> </div>
-                                <table className="doc-table"><thead><tr><th className="w-10 py-3">No</th><th className="py-3">Nama Pengawas</th><th className="w-32 py-3">NIP</th><th className="w-32 py-3">Ruang</th><th className="w-40 py-3">Tanda Tangan</th></tr></thead><tbody>{chunk.map((t, idx) => (<tr key={idx}><td className="text-center py-3">{idx + 1 + (pIdx * 20)}</td><td className="font-bold px-3 py-3 uppercase">{t.name}</td><td className="text-center py-3">{t.nip}</td><td className="text-center py-3">{t.roomName || '-'}</td><td className="text-left px-2 text-xs text-gray-400 align-bottom h-12">{(idx + 1 + (pIdx * 20)) % 2 === 1 ? `${idx + 1 + (pIdx * 20)}..........` : `..........${idx + 1 + (pIdx * 20)}`}</td></tr>))}{Array.from({length: Math.max(0, 15 - chunk.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-12"></td><td></td><td></td><td></td><td></td></tr>))}</tbody></table>
+                                <table className="doc-table"><thead><tr><th className="w-10 py-3">No</th><th className="py-3">Nama Pengawas</th><th className="w-32 py-3">NIP</th><th className="w-32 py-3">Ruang</th><th className="w-40 py-3">Waktu Check-In</th><th className="w-24 py-3">Status</th></tr></thead><tbody>{chunk.map((t, idx) => (<tr key={idx}><td className="text-center py-3">{idx + 1 + (pIdx * 20)}</td><td className="font-bold px-3 py-3 uppercase">{t.name}</td><td className="text-center py-3">{t.nip}</td><td className="text-center py-3">{t.roomName || '-'}</td><td className="text-center py-3 font-mono">{t.checkInTime || '-'}</td><td className="text-center py-3 font-bold">{t.checkInTime ? <span className="text-green-600">HADIR</span> : <span className="text-red-500">BELUM</span>}</td></tr>))}{Array.from({length: Math.max(0, 15 - chunk.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-12"></td><td></td><td></td><td></td><td></td><td></td></tr>))}</tbody></table>
                                 <div className="mt-12 flex justify-end text-sm"> <div className="signature-box text-center w-64"> <div className="mb-2"><div>Kepala Sekolah,</div></div> <div className="ec-sign-space" style={{height: '60px'}}> {schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />} {schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />} </div> <div className="font-bold underline mt-2">{schoolInfo.headmaster}</div> <div>NIP. {schoolInfo.headmasterNip}</div> </div> </div>
                             </div>
                         ))}
@@ -898,7 +899,7 @@
                         <DocCard title="Kartu Peserta" desc="Cetak kartu identitas ujian untuk semua siswa." icon="fa-id-card" color="text-blue-500" onClick={() => setView('cards')} />
                         <DocCard title="Daftar Hadir Siswa" desc="Lembar absensi tanda tangan peserta per ruang." icon="fa-clipboard-list" color="text-green-500" onClick={() => setView('attendance')} />
                         <DocCard title="Label Meja" desc="Nomor peserta ukuran besar untuk ditempel di meja." icon="fa-tag" color="text-orange-500" onClick={() => setView('label')} />
-                        <DocCard title="Absensi Pengawas" desc="Lembar kehadiran manual untuk semua pengawas." icon="fa-user-clock" color="text-teal-600" onClick={() => setView('supervisor')} />
+                        <DocCard title="Laporan Kehadiran Pengawas" desc="Rekapitulasi otomatis check-in pengawas di ruang ujian." icon="fa-user-clock" color="text-teal-600" onClick={() => setView('supervisor')} />
                         <DocCard title="Jadwal Pengawas" desc="Rekapitulasi jadwal tugas mengawas yang telah digenerate." icon="fa-calendar-day" color="text-indigo-600" onClick={() => setView('supervisor_schedule')} />
                         <DocCard title="BA Serah Terima Naskah" desc="Dokumen serah terima soal dari panitia ke pengawas." icon="fa-file-import" color="text-rose-600" onClick={() => setView('ba_naskah')} />
                         <DocCard title="BA Serah Terima LJK" desc="Dokumen serah terima jawaban dari pengawas ke panitia." icon="fa-file-export" color="text-purple-600" onClick={() => setView('ba_ljk')} />
@@ -1117,7 +1118,7 @@
                          {page === 'dashboard' && <Dashboard stats={stats} schedules={schedules} subjects={subjects} rooms={rooms} students={students} attendance={studentAttendance} />}
                          {page === 'master' && <DataMaster students={students} setStudents={setStudents} teachers={teachers} setTeachers={setTeachers} subjects={subjects} setSubjects={setSubjects} rooms={rooms} setRooms={setRooms} />}
                          {page === 'schedule' && <ScheduleManager subjects={subjects} rooms={rooms} teachers={teachers} schedules={schedules} setSchedules={setSchedules} />}
-                         {page === 'print' && <PrintCenter schoolInfo={schoolInfo} students={students} rooms={rooms} subjects={subjects} schedules={schedules} teachers={teachers} />}
+                         {page === 'print' && <PrintCenter schoolInfo={schoolInfo} students={students} rooms={rooms} subjects={subjects} schedules={schedules} teachers={teachers} supervisorAttendance={supervisorAttendance} />}
                          {page === 'settings' && <Settings info={schoolInfo} setInfo={setSchoolInfo} />}
                     </div>
                 </div>
