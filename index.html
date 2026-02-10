@@ -173,7 +173,17 @@
         ];
         const initialSubjects = [{ id: 1, name: "Matematika Wajib", date: "2023-12-04", time: "07:30 - 09:30" }, { id: 2, name: "Bahasa Indonesia", date: "2023-12-04", time: "10:00 - 12:00" }];
         const initialRooms = [{ id: 1, name: "Ruang 01", capacity: 20 }, { id: 2, name: "Ruang 02", capacity: 20 }];
-        const initialSchoolInfo = { agency: "PEMERINTAH PROVINSI DAERAH KHUSUS", name: "SMA NEGERI CONTOH JAKARTA", address: "Jl. Pendidikan No. 1, Jakarta Selatan", examName: "PENILAIAN AKHIR SEMESTER (PAS)", year: "2023/2024", headmaster: "Dr. Kepala Sekolah, M.Pd", headmasterNip: "19700101 199002 1 001", adminPassword: "admin" };
+        const initialSchoolInfo = { 
+            agency: "PEMERINTAH PROVINSI DAERAH KHUSUS", 
+            name: "SMA NEGERI CONTOH JAKARTA", 
+            address: "Jl. Pendidikan No. 1, Jakarta Selatan", 
+            examName: "PENILAIAN AKHIR SEMESTER (PAS)", 
+            year: "2023/2024", 
+            headmaster: "Dr. Kepala Sekolah, M.Pd", 
+            headmasterNip: "19700101 199002 1 001", 
+            adminPassword: "admin",
+            studentIdFormat: "{YY}-{CLASS}-{NUM}" // Default Format
+        };
 
         // --- COMPONENTS UI ---
         const NavButton = ({ active, onClick, icon, label }) => ( <button onClick={onClick} className={`no-print w-full flex items-center p-3 rounded-lg transition-colors duration-200 mb-1 ${active ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-700 text-slate-300 hover:text-white'}`}> <div className="w-8 flex justify-center"><i className={`fas ${icon}`}></i></div> <span className="font-medium text-sm">{label}</span> </button> );
@@ -372,7 +382,7 @@
             );
         };
 
-        const DataMaster = ({ students, setStudents, teachers, setTeachers, subjects, setSubjects, rooms, setRooms }) => {
+        const DataMaster = ({ students, setStudents, teachers, setTeachers, subjects, setSubjects, rooms, setRooms, schoolInfo }) => {
             const [tab, setTab] = useState('siswa');
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [formData, setFormData] = useState({});
@@ -380,23 +390,41 @@
             const fileInputRef = useRef(null);
 
             const generateExamNumbers = () => {
-                if (!confirm("Generate ulang No Ujian untuk semua siswa?")) return;
-                const prefix = "24"; 
+                if (!confirm("Generate ulang No Ujian untuk semua siswa sesuai format di Pengaturan?")) return;
+                
+                // --- LOGIC FORMAT BARU ---
+                const format = schoolInfo.studentIdFormat || '{YY}-{CLASS}-{NUM}';
+                const currentYearFull = new Date().getFullYear().toString();
+                const currentYearShort = currentYearFull.slice(-2);
+
                 const sortedStudents = [...students].sort((a, b) => {
                     const classA = (a.class || "").toString();
                     const classB = (b.class || "").toString();
                     if (classA === classB) { return (a.name || "").localeCompare(b.name || ""); }
                     return classA.localeCompare(classB);
                 });
+
                 const classCounters = {};
                 const updatedStudents = sortedStudents.map(student => {
                     const rawClass = (student.class || "X").toString();
+                    // Ambil 3 huruf pertama alphanumeric dari kelas (X IP -> XIP, XII IPS -> XII)
+                    const classCode = rawClass.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase(); 
+
                     if (!classCounters[rawClass]) { classCounters[rawClass] = 1; }
                     const serial = String(classCounters[rawClass]).padStart(3, '0');
-                    const newExamNumber = `${prefix}-${rawClass.replace(/\s/g,'').toUpperCase().substring(0,3)}-${serial}`;
+                    
+                    // Replace placeholders
+                    let newExamNumber = format
+                        .replace('{YY}', currentYearShort)
+                        .replace('{YYYY}', currentYearFull)
+                        .replace('{CLASS}', classCode)
+                        .replace('{NUM}', serial);
+
                     classCounters[rawClass]++;
                     return { ...student, examNumber: newExamNumber };
                 });
+                // -------------------------
+
                 setStudents(updatedStudents);
                 alert('Nomor Ujian berhasil di-generate ulang!');
             };
@@ -1200,6 +1228,19 @@
                                 <input name="headmasterNip" value={info.headmasterNip || ''} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition" />
                             </div>
 
+                            {/* --- FORMAT NOMOR PESERTA --- */}
+                            <div className="md:col-span-2 pb-4 border-b border-gray-100 mb-2">
+                                <h3 className="text-lg font-bold text-gray-700 mb-4 flex items-center"><i className="fas fa-barcode text-indigo-500 mr-2"></i> Format Nomor Peserta</h3>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Template Format</label>
+                                    <input name="studentIdFormat" value={info.studentIdFormat || '{YY}-{CLASS}-{NUM}'} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition font-mono" placeholder="{YY}-{CLASS}-{NUM}" />
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        Gunakan placeholder: <span className="font-mono bg-gray-100 px-1 rounded">{'{YY}'}</span> (Tahun 2 digit), <span className="font-mono bg-gray-100 px-1 rounded">{'{YYYY}'}</span> (Tahun 4 digit), <span className="font-mono bg-gray-100 px-1 rounded">{'{CLASS}'}</span> (Kode Kelas), <span className="font-mono bg-gray-100 px-1 rounded">{'{NUM}'}</span> (No Urut).
+                                        <br/>Contoh hasil: <span className="font-bold">24-XIP-001</span>
+                                    </p>
+                                </div>
+                            </div>
+
                             {/* Keamanan */}
                             <div className="md:col-span-2 mt-4 p-4 bg-yellow-50 rounded-xl border border-yellow-100">
                                 <h3 className="font-bold text-yellow-800 mb-4 flex items-center"><i className="fas fa-shield-alt mr-2"></i> Keamanan Akses</h3>
@@ -1311,7 +1352,7 @@
                     </div>
                     <div className="flex-1 ml-64 p-8 overflow-y-auto h-screen print:ml-0 print:p-0">
                          {page === 'dashboard' && <Dashboard stats={stats} schedules={schedules} subjects={subjects} rooms={rooms} students={students} attendance={studentAttendance} />}
-                         {page === 'master' && <DataMaster students={students} setStudents={setStudents} teachers={teachers} setTeachers={setTeachers} subjects={subjects} setSubjects={setSubjects} rooms={rooms} setRooms={setRooms} />}
+                         {page === 'master' && <DataMaster students={students} setStudents={setStudents} teachers={teachers} setTeachers={setTeachers} subjects={subjects} setSubjects={setSubjects} rooms={rooms} setRooms={setRooms} schoolInfo={schoolInfo} />}
                          {page === 'schedule' && <ScheduleManager subjects={subjects} rooms={rooms} teachers={teachers} schedules={schedules} setSchedules={setSchedules} />}
                          {page === 'print' && <PrintCenter schoolInfo={schoolInfo} students={students} rooms={rooms} subjects={subjects} schedules={schedules} teachers={teachers} supervisorAttendance={supervisorAttendance} />}
                          {page === 'settings' && <Settings info={schoolInfo} setInfo={setSchoolInfo} />}
