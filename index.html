@@ -53,6 +53,12 @@
         .doc-table th, .doc-table td { border: 1px solid black; padding: 5px; }
         .doc-table th { background-color: #f0f0f0; text-align: center; font-weight: bold; }
         
+        /* --- LAYOUT TANDA TANGAN (PERBAIKAN) --- */
+        .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 40px; page-break-inside: avoid; }
+        .signature-box { text-align: center; position: relative; }
+        .sign-img { height: 50px; object-fit: contain; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); z-index: 10; }
+        .stamp-img { height: 55px; object-fit: contain; position: absolute; bottom: 5px; left: 30px; transform: rotate(-10deg); opacity: 0.8; z-index: 5; }
+
         /* --- KARTU PESERTA --- */
         .card-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(4, 1fr); gap: 4mm; height: 100%; }
         .exam-card { border: 1px solid #000; height: 100%; display: flex; flex-direction: column; background-color: #fff; box-sizing: border-box; position: relative; font-size: 8pt; overflow: hidden; }
@@ -63,7 +69,7 @@
         .ec-school { font-size: 7pt; font-weight: 800; text-transform: uppercase; }
         .ec-exam { font-size: 6pt; font-weight: bold; margin-top: 1px; }
         .ec-body { padding: 4px; flex: 1; display: flex; gap: 6px; }
-        .ec-photo-box { width: 20mm; height: 25mm; border: 1px solid #aaa; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 6pt; text-align: center; color: #bbb; flex-shrink: 0; margin-top: 2px; }
+        .ec-photo-box { width: 20mm; height: 25mm; border: 1px solid #aaa; background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; overflow: hidden; }
         .ec-details { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
         .ec-row { display: flex; margin-bottom: 1px; line-height: 1.2; }
         .ec-label { width: 50px; font-weight: 600; font-size: 7.5pt; }
@@ -82,9 +88,6 @@
         .animate-fade-in-down { animation: fadeInDown 0.5s ease-out; }
         @keyframes fadeInDown { 0% { opacity: 0; transform: translateY(-10px); } 100% { opacity: 1; transform: translateY(0); } }
         .loading-screen { position: fixed; inset: 0; background: white; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .signature-box { text-align: center; position: relative; }
-        .sign-img { height: 50px; object-fit: contain; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); z-index: 10; }
-        .stamp-img { height: 55px; object-fit: contain; position: absolute; bottom: 5px; left: 30px; transform: rotate(-10deg); opacity: 0.8; z-index: 5; }
 
         /* --- PACT MODAL STYLE --- */
         .pact-content { max-height: 60vh; overflow-y: auto; background: #f9fafb; padding: 1rem; border-radius: 0.5rem; border: 1px solid #e5e7eb; font-size: 0.9rem; line-height: 1.6; color: #374151; margin-bottom: 1rem; text-align: justify; }
@@ -162,7 +165,12 @@
 
         // --- DATA DEFAULT ---
         const initialStudents = Array.from({ length: 42 }, (_, i) => ({ id: i + 1, name: `Siswa Peserta ${i + 1}`, class: i < 20 ? "XII IPA 1" : "XII IPS 1", examNumber: `24-01-${String(i+1).padStart(3,'0')}`, roomId: i < 20 ? 1 : 2 }));
-        const initialTeachers = [{ id: 1, name: "Budi Santoso, S.Pd", nip: "19800101" }, { id: 2, name: "Siti Aminah, M.Pd", nip: "19850202" }, { id: 3, name: "Dedi Corbusi, S.Kom", nip: "-" }, { id: 4, name: "Rina Nose, S.Psi", nip: "-" }];
+        const initialTeachers = [
+            { id: 1, name: "Budi Santoso, S.Pd", nip: "19800101", subjects: ["Matematika Wajib", "Matematika Peminatan"], classes: ["XII IPA 1", "XII IPA 2"] },
+            { id: 2, name: "Siti Aminah, M.Pd", nip: "19850202", subjects: ["Bahasa Indonesia"], classes: ["XII IPA 1", "XII IPS 1"] },
+            { id: 3, name: "Dedi Corbusi, S.Kom", nip: "-", subjects: ["TIK"], classes: ["XII IPA 1", "XII IPA 2", "XII IPS 1"] },
+            { id: 4, name: "Rina Nose, S.Psi", nip: "-", subjects: ["BK"], classes: ["Semua Kelas"] }
+        ];
         const initialSubjects = [{ id: 1, name: "Matematika Wajib", date: "2023-12-04", time: "07:30 - 09:30" }, { id: 2, name: "Bahasa Indonesia", date: "2023-12-04", time: "10:00 - 12:00" }];
         const initialRooms = [{ id: 1, name: "Ruang 01", capacity: 20 }, { id: 2, name: "Ruang 02", capacity: 20 }];
         const initialSchoolInfo = { agency: "PEMERINTAH PROVINSI DAERAH KHUSUS", name: "SMA NEGERI CONTOH JAKARTA", address: "Jl. Pendidikan No. 1, Jakarta Selatan", examName: "PENILAIAN AKHIR SEMESTER (PAS)", year: "2023/2024", headmaster: "Dr. Kepala Sekolah, M.Pd", headmasterNip: "19700101 199002 1 001", adminPassword: "admin" };
@@ -433,8 +441,52 @@
             };
 
             const handleDelete = (id, type) => { if(confirm("Hapus data ini?")) { if(type==='siswa') setStudents(prev=>prev.filter(x=>x.id!==id)); if(type==='guru') setTeachers(prev=>prev.filter(x=>x.id!==id)); if(type==='mapel') setSubjects(prev=>prev.filter(x=>x.id!==id)); if(type==='ruang') setRooms(prev=>prev.filter(x=>x.id!==id)); } };
-            const handleSave = (e) => { e.preventDefault(); const id=formData.id||Date.now(); const newData={...formData,id}; if(tab==='siswa') { if(formData.id) setStudents(prev=>prev.map(x=>x.id===id?newData:x)); else setStudents(prev=>[...prev,newData]); } if(tab==='guru') { if(formData.id) setTeachers(prev=>prev.map(x=>x.id===id?newData:x)); else setTeachers(prev=>[...prev,newData]); } if(tab==='mapel') { if(formData.id) setSubjects(prev=>prev.map(x=>x.id===id?newData:x)); else setSubjects(prev=>[...prev,newData]); } if(tab==='ruang') { if(formData.id) setRooms(prev=>prev.map(x=>x.id===id?newData:x)); else setRooms(prev=>[...prev,newData]); } setIsModalOpen(false); setFormData({}); };
-            const openEdit = (item) => { setFormData(item); setIsModalOpen(true); };
+            
+            const handleSave = (e) => { 
+                e.preventDefault(); 
+                const id = formData.id || Date.now(); 
+                let newData = { ...formData, id }; 
+                
+                if(tab==='siswa') { 
+                    if(formData.id) setStudents(prev=>prev.map(x=>x.id===id?newData:x)); 
+                    else setStudents(prev=>[...prev,newData]); 
+                } 
+                if(tab==='guru') { 
+                    // Parse string inputs back to arrays
+                    newData = {
+                        ...newData,
+                        subjects: formData.subjectsStr ? formData.subjectsStr.split(',').map(s => s.trim()).filter(Boolean) : [],
+                        classes: formData.classesStr ? formData.classesStr.split(',').map(s => s.trim()).filter(Boolean) : []
+                    };
+                    delete newData.subjectsStr;
+                    delete newData.classesStr;
+
+                    if(formData.id) setTeachers(prev=>prev.map(x=>x.id===id?newData:x)); 
+                    else setTeachers(prev=>[...prev,newData]); 
+                } 
+                if(tab==='mapel') { 
+                    if(formData.id) setSubjects(prev=>prev.map(x=>x.id===id?newData:x)); 
+                    else setSubjects(prev=>[...prev,newData]); 
+                } 
+                if(tab==='ruang') { 
+                    if(formData.id) setRooms(prev=>prev.map(x=>x.id===id?newData:x)); 
+                    else setRooms(prev=>[...prev,newData]); 
+                } 
+                setIsModalOpen(false); 
+                setFormData({}); 
+            };
+            
+            const openEdit = (item) => { 
+                let editData = { ...item };
+                if (tab === 'guru') {
+                    // Convert arrays to comma-separated strings for editing
+                    editData.subjectsStr = item.subjects ? item.subjects.join(', ') : '';
+                    editData.classesStr = item.classes ? item.classes.join(', ') : '';
+                }
+                setFormData(editData); 
+                setIsModalOpen(true); 
+            };
+            
             const openAdd = () => { setFormData({}); setIsModalOpen(true); };
 
             const tabs = [{id:'siswa', label:'Siswa', icon:'fa-user'}, {id:'guru', label:'Guru', icon:'fa-chalkboard-teacher'}, {id:'mapel', label:'Mapel', icon:'fa-book'}, {id:'ruang', label:'Ruang', icon:'fa-door-open'}];
@@ -468,6 +520,7 @@
                                     <tr>
                                         <th className="px-4 py-3">Nama</th>
                                         <th className="px-4 py-3">Detail</th>
+                                        {tab === 'guru' && <th className="px-4 py-3">Mengajar</th>}
                                         <th className="px-4 py-3 text-right">Aksi</th>
                                     </tr>
                                 </thead>
@@ -481,6 +534,16 @@
                                                 {tab==='mapel' && `${item.date} ${item.time}`}
                                                 {tab==='ruang' && `Kapasitas: ${item.capacity}`}
                                             </td>
+                                            {tab === 'guru' && (
+                                                <td className="px-4 py-3 text-gray-500">
+                                                    <div className="text-xs">
+                                                        <span className="font-bold">Mapel:</span> {item.subjects ? item.subjects.join(', ') : '-'}
+                                                    </div>
+                                                    <div className="text-xs mt-1">
+                                                        <span className="font-bold">Kelas:</span> {item.classes ? item.classes.join(', ') : '-'}
+                                                    </div>
+                                                </td>
+                                            )}
                                             <td className="px-4 py-3 text-right">
                                                 <button onClick={()=>openEdit(item)} className="text-blue-600 hover:text-blue-800 mr-3"><i className="fas fa-edit"></i></button>
                                                 <button onClick={()=>handleDelete(item.id, tab)} className="text-red-600 hover:text-red-800"><i className="fas fa-trash"></i></button>
@@ -498,7 +561,19 @@
                                 <form onSubmit={handleSave} className="space-y-3">
                                     <input required className="w-full border p-2 rounded" placeholder="Nama" value={formData.name||''} onChange={e=>setFormData({...formData, name:e.target.value})} />
                                     {tab==='siswa' && <><input required className="w-full border p-2 rounded" placeholder="Kelas" value={formData.class||''} onChange={e=>setFormData({...formData, class:e.target.value})} /><input required className="w-full border p-2 rounded" placeholder="No Ujian" value={formData.examNumber||''} onChange={e=>setFormData({...formData, examNumber:e.target.value})} /><select required className="w-full border p-2 rounded" value={formData.roomId||''} onChange={e=>setFormData({...formData, roomId: Number(e.target.value)})}> <option value="">Pilih Ruang</option> {rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)} </select></>}
-                                    {tab==='guru' && <input className="w-full border p-2 rounded" placeholder="NIP" value={formData.nip||''} onChange={e=>setFormData({...formData, nip:e.target.value})} />}
+                                    {tab==='guru' && (
+                                        <>
+                                            <input className="w-full border p-2 rounded" placeholder="NIP" value={formData.nip||''} onChange={e=>setFormData({...formData, nip:e.target.value})} />
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 mb-1">Mata Pelajaran (pisahkan dengan koma)</label>
+                                                <input className="w-full border p-2 rounded" placeholder="Contoh: Matematika, Fisika" value={formData.subjectsStr||''} onChange={e=>setFormData({...formData, subjectsStr:e.target.value})} />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 mb-1">Kelas (pisahkan dengan koma)</label>
+                                                <input className="w-full border p-2 rounded" placeholder="Contoh: XII IPA 1, XII IPS 2" value={formData.classesStr||''} onChange={e=>setFormData({...formData, classesStr:e.target.value})} />
+                                            </div>
+                                        </>
+                                    )}
                                     {tab==='mapel' && <><input required type="date" className="w-full border p-2 rounded" value={formData.date||''} onChange={e=>setFormData({...formData, date:e.target.value})} /><input required className="w-full border p-2 rounded" placeholder="Waktu" value={formData.time||''} onChange={e=>setFormData({...formData, time:e.target.value})} /></>}
                                     {tab==='ruang' && <input required type="number" className="w-full border p-2 rounded" placeholder="Kapasitas" value={formData.capacity||''} onChange={e=>setFormData({...formData, capacity:e.target.value})} />}
                                     <div className="flex justify-end gap-2 mt-4">
@@ -632,6 +707,39 @@
                                 <div className="card-grid">
                                     {chunk.map(s => {
                                         const roomName = rooms.find(r => String(r.id) === String(s.roomId))?.name || '-';
+                                        
+                                        // --- LOGIC QR CODE LENGKAP ---
+                                        // 1. Cari jadwal yang terhubung ke ruangan siswa ini
+                                        const mySchedules = schedules.filter(sch => String(sch.roomId) === String(s.roomId));
+                                        
+                                        // 2. Ambil detail subject berdasarkan schedule
+                                        const mySubjects = mySchedules.map(sch => {
+                                            return subjects.find(sub => String(sub.id) === String(sch.subjectId));
+                                        }).filter(Boolean); // Hapus jika undefined
+
+                                        // 3. Urutkan berdasarkan Tanggal lalu Waktu
+                                        mySubjects.sort((a, b) => {
+                                            const dateA = a.date || '';
+                                            const dateB = b.date || '';
+                                            if (dateA !== dateB) return dateA.localeCompare(dateB);
+                                            return (a.time || '').localeCompare(b.time || '');
+                                        });
+
+                                        // 4. Susun Text QR Code
+                                        let qrInfo = `SISWA: ${s.name}\nNO: ${s.examNumber}\nKELAS: ${s.class}\nRUANG: ${roomName}\n\nJADWAL UJIAN:`;
+                                        
+                                        if (mySubjects.length > 0) {
+                                            mySubjects.forEach((sub, idx) => {
+                                                qrInfo += `\n${idx + 1}. ${sub.name}\n   [${sub.date}, ${sub.time}]`;
+                                            });
+                                        } else {
+                                            qrInfo += "\n(Belum ada jadwal)";
+                                        }
+
+                                        // Encode ke URL QR Code
+                                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrInfo)}`;
+                                        // -----------------------------
+                                        
                                         return (
                                             <div key={s.id} className="exam-card">
                                                 <div className="ec-header">
@@ -643,8 +751,12 @@
                                                     </div>
                                                 </div>
                                                 <div className="ec-body">
-                                                    <div className="ec-photo-box flex flex-col items-center justify-center bg-white p-1 border-slate-300">
-                                                        <div className="text-[6pt] text-center mt-1 font-bold text-slate-600">FOTO</div>
+                                                    <div className="ec-photo-box flex flex-col items-center justify-center bg-white p-1 border-slate-300 relative group">
+                                                        <img src={qrUrl} alt="QR" className="w-full h-full object-contain" />
+                                                        {/* Tooltip sederhana saat hover di layar (tidak tercetak) */}
+                                                        <div className="absolute inset-0 bg-black bg-opacity-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                                                            <span className="text-[8px] bg-black text-white px-1 rounded">Scan Info</span>
+                                                        </div>
                                                     </div>
                                                     <div className="ec-details">
                                                         <div>
@@ -882,6 +994,87 @@
                 );
             };
 
+            // 8. Daftar Pengambilan LJK oleh Guru (FITUR BARU)
+            const CollectionListLayout = () => {
+                // Filter guru yang memiliki data mapel/kelas (asumsi guru aktif)
+                const activeTeachers = teachers.filter(t => t.subjects && t.subjects.length > 0).sort((a,b) => a.name.localeCompare(b.name));
+                const ITEMS_PER_PAGE = 12; // Lebih sedikit karena konten teks mungkin panjang
+                const chunks = [];
+                for (let i = 0; i < activeTeachers.length; i += ITEMS_PER_PAGE) {
+                    chunks.push(activeTeachers.slice(i, i + ITEMS_PER_PAGE));
+                }
+
+                if (activeTeachers.length === 0) return <div className="bg-gray-200 p-4 min-h-screen flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow text-center"><i className="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-2"></i><p className="text-gray-600 font-bold">Data Guru belum lengkap.</p><p className="text-sm text-gray-500">Pastikan Data Guru sudah diisi Mapel & Kelas di menu Data Master.</p><button onClick={() => setView('menu')} className="mt-4 text-blue-600 underline">Kembali</button></div></div>;
+
+                return (
+                    <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
+                        <BackBtn />
+                        {chunks.map((chunk, pIdx) => (
+                            <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
+                                <DocHeader school={schoolInfo} title="DAFTAR PENGAMBILAN LEMBAR JAWABAN" />
+                                <div className="mb-4 text-sm font-bold text-center border border-black p-2 bg-gray-50">
+                                    Hari / Tanggal Pengambilan: ............................................................................
+                                </div>
+                                <table className="doc-table">
+                                    <thead>
+                                        <tr>
+                                            <th className="w-10 py-3">No</th>
+                                            <th className="py-3">Nama Guru & NIP</th>
+                                            <th className="w-1/4 py-3">Mata Pelajaran Diampu</th>
+                                            <th className="w-1/4 py-3">Kelas Diajar</th>
+                                            <th className="w-32 py-3">Tanda Tangan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {chunk.map((t, idx) => {
+                                            const globalIdx = idx + 1 + (pIdx * ITEMS_PER_PAGE);
+                                            return (
+                                                <tr key={t.id}>
+                                                    <td className="text-center align-top py-3">{globalIdx}</td>
+                                                    <td className="align-top py-3 px-3">
+                                                        <div className="font-bold uppercase text-sm">{t.name}</div>
+                                                        <div className="text-xs text-gray-500 mt-1">NIP. {t.nip}</div>
+                                                    </td>
+                                                    <td className="align-top py-3 px-3 text-sm">
+                                                        {t.subjects && t.subjects.length > 0 ? (
+                                                            <ul className="list-disc list-inside text-xs">
+                                                                {t.subjects.map((sub, i) => <li key={i}>{sub}</li>)}
+                                                            </ul>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td className="align-top py-3 px-3 text-sm">
+                                                        <div className="text-xs leading-relaxed">{t.classes ? t.classes.join(', ') : '-'}</div>
+                                                    </td>
+                                                    <td className="text-left align-bottom px-2 text-xs text-gray-400 h-20 border-b-0">
+                                                        {globalIdx % 2 === 1 ? `${globalIdx}..........` : `..........${globalIdx}`}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {/* Row Filler untuk halaman terakhir */}
+                                        {Array.from({length: Math.max(0, ITEMS_PER_PAGE - chunk.length)}).map((_, i) => (
+                                            <tr key={`empty-${i}`}><td className="h-20"></td><td></td><td></td><td></td><td></td></tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                
+                                {pIdx === chunks.length - 1 && (
+                                    <div className="mt-12 flex justify-end text-sm">
+                                        <div className="signature-box text-center w-64">
+                                            <div className="mb-2"><div>Koordinator Ujian / Panitia,</div></div>
+                                            <div className="ec-sign-space" style={{height: '60px'}}>
+                                                {/* Space TTD Panitia (Kosong atau Upload) */}
+                                            </div>
+                                            <div className="font-bold underline mt-2">( ............................................ )</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
             // Main Render Switch
             if (view === 'cards') return <CardLayout />;
             if (view === 'attendance') return <AttendanceLayout />;
@@ -890,6 +1083,7 @@
             if (view === 'supervisor_schedule') return <SupervisorScheduleLayout />;
             if (view === 'ba_naskah') return <HandoverScriptLayout />;
             if (view === 'ba_ljk') return <HandoverAnswerLayout />;
+            if (view === 'collection') return <CollectionListLayout />; // Tambahan
 
             return (
                 <div className="animate-fade-in-down">
@@ -901,6 +1095,7 @@
                         <DocCard title="Label Meja" desc="Nomor peserta ukuran besar untuk ditempel di meja." icon="fa-tag" color="text-orange-500" onClick={() => setView('label')} />
                         <DocCard title="Laporan Kehadiran Pengawas" desc="Rekapitulasi otomatis check-in pengawas di ruang ujian." icon="fa-user-clock" color="text-teal-600" onClick={() => setView('supervisor')} />
                         <DocCard title="Jadwal Pengawas" desc="Rekapitulasi jadwal tugas mengawas yang telah digenerate." icon="fa-calendar-day" color="text-indigo-600" onClick={() => setView('supervisor_schedule')} />
+                        <DocCard title="Daftar Pengambilan LJK" desc="Lembar tanda tangan guru saat mengambil hasil jawaban siswa." icon="fa-file-signature" color="text-pink-600" onClick={() => setView('collection')} />
                         <DocCard title="BA Serah Terima Naskah" desc="Dokumen serah terima soal dari panitia ke pengawas." icon="fa-file-import" color="text-rose-600" onClick={() => setView('ba_naskah')} />
                         <DocCard title="BA Serah Terima LJK" desc="Dokumen serah terima jawaban dari pengawas ke panitia." icon="fa-file-export" color="text-purple-600" onClick={() => setView('ba_ljk')} />
                     </div>
