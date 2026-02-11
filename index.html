@@ -402,8 +402,10 @@
             const fileInputRef = useRef(null);
 
             const generateExamNumbers = () => {
-                if (!confirm("Generate ulang No Ujian untuk semua siswa?")) return;
-                const prefix = "24"; 
+                if (!confirm("Generate ulang No Ujian untuk semua siswa sesuai format di Pengaturan?")) return;
+                const format = schoolInfo.studentIdFormat || '{YY}-{CLASS}-{NUM}';
+                const currentYearFull = new Date().getFullYear().toString();
+                const currentYearShort = currentYearFull.slice(-2);
                 const sortedStudents = [...students].sort((a, b) => {
                     const classA = (a.class || "").toString();
                     const classB = (b.class || "").toString();
@@ -413,14 +415,15 @@
                 const classCounters = {};
                 const updatedStudents = sortedStudents.map(student => {
                     const rawClass = (student.class || "X").toString();
+                    const classCode = rawClass.replace(/[^a-zA-Z0-9]/g, '').substring(0, 3).toUpperCase(); 
                     if (!classCounters[rawClass]) { classCounters[rawClass] = 1; }
                     const serial = String(classCounters[rawClass]).padStart(3, '0');
-                    const newExamNumber = `${prefix}-${rawClass.replace(/\s/g,'').toUpperCase().substring(0,3)}-${serial}`;
+                    let newExamNumber = format.replace('{YY}', currentYearShort).replace('{YYYY}', currentYearFull).replace('{CLASS}', classCode).replace('{NUM}', serial);
                     classCounters[rawClass]++;
                     return { ...student, examNumber: newExamNumber };
                 });
                 setStudents(updatedStudents);
-                alert('Nomor Ujian berhasil di-generate ulang!');
+                alert('Nomor Ujian berhasil di-generate ulang sesuai format pengaturan!');
             };
             
             const resetExamNumbers = () => {
