@@ -188,6 +188,18 @@
         // --- COMPONENTS UI ---
         const NavButton = ({ active, onClick, icon, label }) => ( <button onClick={onClick} className={`no-print w-full flex items-center p-3 rounded-lg transition-colors duration-200 mb-1 ${active ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-700 text-slate-300 hover:text-white'}`}> <div className="w-8 flex justify-center"><i className={`fas ${icon}`}></i></div> <span className="font-medium text-sm">{label}</span> </button> );
         const DocCard = ({ title, desc, icon, color, onClick }) => ( <div onClick={onClick} className="bg-white p-6 rounded-lg shadow cursor-pointer hover:shadow-lg hover:border-blue-500 border border-transparent transition-all group"> <div className="flex items-start justify-between"> <div> <h4 className="font-bold text-lg group-hover:text-blue-600">{title}</h4> <p className="text-sm text-gray-500 mt-1">{desc}</p> </div> <i className={`fas ${icon} text-2xl ${color}`}></i> </div> <div className="mt-4 text-xs font-bold text-gray-400 uppercase group-hover:text-blue-500">Klik untuk Preview</div> </div> );
+        
+        const StatCard = ({ title, value, icon, color }) => (
+            <div className={`p-4 rounded-xl shadow-sm bg-white border-l-4 ${color.replace('text-', 'border-')} flex justify-between items-center transform hover:-translate-y-1 transition duration-200`}>
+                <div>
+                    <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{title}</p>
+                    <p className="text-2xl font-bold text-gray-800">{value}</p>
+                </div>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl bg-gray-50 ${color}`}>
+                    <i className={`fas ${icon}`}></i>
+                </div>
+            </div>
+        );
 
         const IntegrityPactModal = ({ teacherName, onAgree }) => {
             const [checked, setChecked] = useState(false);
@@ -410,6 +422,13 @@
                 setStudents(updatedStudents);
                 alert('Nomor Ujian berhasil di-generate ulang!');
             };
+            
+            const resetExamNumbers = () => {
+                if (!confirm("Hapus semua Nomor Ujian siswa? Tindakan ini akan mengosongkan kolom No. Ujian.")) return;
+                const updatedStudents = students.map(student => ({ ...student, examNumber: "" }));
+                setStudents(updatedStudents);
+                alert('Nomor Ujian berhasil di-reset!');
+            };
 
             const downloadTemplate = () => {
                 const templateData = [
@@ -536,6 +555,7 @@
                             {tab === 'siswa' && (
                                 <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
                                     <button onClick={generateExamNumbers} className="bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-purple-200 transition whitespace-nowrap flex items-center"><i className="fas fa-magic mr-2"></i> Auto No.</button>
+                                    <button onClick={resetExamNumbers} className="bg-red-100 text-red-700 border border-red-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-red-200 transition whitespace-nowrap flex items-center"><i className="fas fa-eraser mr-2"></i> Reset No.</button>
                                     <button onClick={downloadTemplate} className="bg-green-100 text-green-700 border border-green-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-green-200 transition whitespace-nowrap flex items-center"><i className="fas fa-file-excel mr-2"></i> Template</button>
                                     <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
                                     <button onClick={() => fileInputRef.current.click()} className="bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-2 rounded-lg text-xs font-bold hover:bg-emerald-200 transition whitespace-nowrap flex items-center"><i className="fas fa-upload mr-2"></i> Import</button>
@@ -676,6 +696,7 @@
             const [view, setView] = useState('menu');
             const [selectedRoom, setSelectedRoom] = useState('all');
             const [selectedSubject, setSelectedSubject] = useState(subjects[0]?.id || 0);
+            const ITEMS_PER_PAGE = 20;
 
             const handlePrint = () => window.print();
 
@@ -828,6 +849,13 @@
                             const roomStudents = students.filter(s => String(s.roomId) === String(room.id));
                             const schedule = schedules.find(s => String(s.subjectId) === String(activeSubject.id) && String(s.roomId) === String(room.id));
                             const t1 = teachers.find(t => String(t.id) === String(schedule?.invigilatorId));
+                            
+                            // FILL EMPTY ROWS
+                            const rows = [...roomStudents];
+                            while(rows.length < 20) {
+                                rows.push({ id: `empty-${rows.length}`, name: '', examNumber: '' });
+                            }
+
                             return (
                                 <div key={room.id} className="a4-sheet mx-auto bg-white mb-4 page-break">
                                     <DocHeader school={schoolInfo} title="DAFTAR HADIR PESERTA" subtitle={`RUANG: ${room.name}`} />
@@ -838,8 +866,17 @@
                                     <table className="doc-table">
                                         <thead><tr><th className="w-10">No</th><th className="w-32">No. Ujian</th><th>Nama Peserta</th><th className="w-32">Tanda Tangan</th><th className="w-16">Ket</th></tr></thead>
                                         <tbody>
-                                            {roomStudents.map((s, idx) => (<tr key={s.id}><td className="text-center">{idx + 1}</td><td className="text-center font-mono">{s.examNumber}</td><td className="uppercase">{s.name}</td><td className="text-left text-xs text-gray-400 align-bottom h-8">{idx % 2 === 0 ? `${idx + 1}..........` : `..........${idx + 1}`}</td><td></td></tr>))}
-                                            {Array.from({length: Math.max(0, 20 - roomStudents.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-8"></td><td></td><td></td><td></td><td></td></tr>))}
+                                            {rows.map((s, idx) => (
+                                                <tr key={s.id}>
+                                                    <td className="text-center h-8 align-middle">{idx + 1}</td>
+                                                    <td className="text-center font-mono align-middle">{s.examNumber}</td>
+                                                    <td className="uppercase align-middle pl-2">{s.name}</td>
+                                                    <td className="text-left text-xs text-gray-400 align-bottom pl-2">
+                                                        {s.name ? (idx % 2 === 0 ? `${idx + 1}..........` : `..........${idx + 1}`) : ''}
+                                                    </td>
+                                                    <td></td>
+                                                </tr>
+                                            ))}
                                         </tbody>
                                     </table>
                                     <div className="mt-8 flex justify-end text-sm"><div className="signature-box text-center w-64"><div className="mb-8"><div>Pengawas Ruang,</div></div><div className="font-bold underline mt-16">{t1?.name || '....................................'}</div><div>NIP. {t1?.nip || '-'}</div></div></div>
@@ -887,19 +924,90 @@
                     const checkInTime = supervisorAttendance ? supervisorAttendance[sch.id] : null;
                     return { ...teacher, roomName: room?.name, checkInTime };
                 }).filter(t => t.id).sort((a, b) => (a.roomName || '').localeCompare(b.roomName || ''));
-                const chunks = []; for (let i = 0; i < scheduledTeachers.length; i += 20) { chunks.push(scheduledTeachers.slice(i, i + 20)); }
-                if (scheduledTeachers.length === 0) return <div className="bg-gray-200 p-4 min-h-screen flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow text-center"><i className="fas fa-info-circle text-4xl text-blue-500 mb-2"></i><p className="text-gray-600 font-bold mb-2">Belum ada pengawas terjadwal untuk mapel ini.</p><p className="text-sm text-gray-500">Silakan generate jadwal atau pilih mapel lain.</p><button onClick={() => setView('menu')} className="mt-4 text-blue-600 underline">Kembali</button></div></div>;
+                
+                const ITEMS_PER_PAGE = 15; 
+                const chunks = []; 
+                
+                if (scheduledTeachers.length === 0) {
+                     chunks.push([]);
+                } else {
+                    for (let i = 0; i < scheduledTeachers.length; i += ITEMS_PER_PAGE) { 
+                        chunks.push(scheduledTeachers.slice(i, i + ITEMS_PER_PAGE)); 
+                    }
+                }
+
                 return (
                     <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
                         <BackBtn />
-                        {chunks.map((chunk, pIdx) => (
-                            <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
-                                <DocHeader school={schoolInfo} title="LAPORAN HASIL CHECK-IN PENGAWAS" />
-                                <div className="mb-6 text-sm"> <table className="w-full"><tbody><tr><td className="font-bold w-32">Hari / Tanggal</td><td>: {activeSubject?.date || '-'}</td></tr><tr><td className="font-bold w-32">Mata Pelajaran</td><td>: {activeSubject?.name || '-'}</td></tr><tr><td className="font-bold w-32">Waktu</td><td>: {activeSubject?.time || '-'}</td></tr></tbody></table> </div>
-                                <table className="doc-table"><thead><tr><th className="w-10 py-3">No</th><th className="py-3">Nama Pengawas</th><th className="w-32 py-3">NIP</th><th className="w-32 py-3">Ruang</th><th className="w-40 py-3">Waktu Check-In</th><th className="w-24 py-3">Status</th></tr></thead><tbody>{chunk.map((t, idx) => (<tr key={idx}><td className="text-center py-3">{idx + 1 + (pIdx * 20)}</td><td className="font-bold px-3 py-3 uppercase">{t.name}</td><td className="text-center py-3">{t.nip}</td><td className="text-center py-3">{t.roomName || '-'}</td><td className="text-center py-3 font-mono">{t.checkInTime || '-'}</td><td className="text-center py-3 font-bold">{t.checkInTime ? <span className="text-green-600">HADIR</span> : <span className="text-red-500">BELUM</span>}</td></tr>))}{Array.from({length: Math.max(0, 15 - chunk.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-12"></td><td></td><td></td><td></td><td></td></tr>))}</tbody></table>
-                                <div className="mt-12 flex justify-end text-sm"> <div className="signature-box text-center w-64"> <div className="mb-2"><div>Kepala Sekolah,</div></div> <div className="ec-sign-space" style={{height: '60px'}}> {schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />} {schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />} </div> <div className="font-bold underline mt-2">{schoolInfo.headmaster}</div> <div>NIP. {schoolInfo.headmasterNip}</div> </div> </div>
-                            </div>
-                        ))}
+                        {chunks.map((chunk, pIdx) => {
+                            const rows = [...chunk];
+                            while(rows.length < ITEMS_PER_PAGE) {
+                                rows.push({ id: `empty-${rows.length}`, name: '', nip: '', roomName: '', checkInTime: '' });
+                            }
+
+                            return (
+                                <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break flex flex-col justify-between">
+                                    <div>
+                                        <DocHeader school={schoolInfo} title="LAPORAN HASIL CHECK-IN PENGAWAS" />
+                                        <div className="mb-4 text-sm"> 
+                                            <table className="w-full">
+                                                <tbody>
+                                                    <tr><td className="font-bold w-32">Hari / Tanggal</td><td>: {activeSubject?.date || '....................'}</td></tr>
+                                                    <tr><td className="font-bold w-32">Mata Pelajaran</td><td>: {activeSubject?.name || '....................'}</td></tr>
+                                                    <tr><td className="font-bold w-32">Waktu</td><td>: {activeSubject?.time || '....................'}</td></tr>
+                                                </tbody>
+                                            </table> 
+                                        </div>
+                                        <table className="doc-table w-full">
+                                            <thead>
+                                                <tr>
+                                                    <th className="w-10 py-2">No</th>
+                                                    <th className="py-2">Nama Pengawas</th>
+                                                    <th className="w-32 py-2">NIP</th>
+                                                    <th className="w-32 py-2">Ruang</th>
+                                                    <th className="w-32 py-2">Waktu Check-In</th>
+                                                    <th className="w-24 py-2">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rows.map((t, idx) => {
+                                                    const rowNum = idx + 1 + (pIdx * ITEMS_PER_PAGE);
+                                                    const showNum = t.name ? rowNum : '';
+                                                    return (
+                                                        <tr key={t.id || idx}>
+                                                            <td className="text-center py-2 h-10 align-middle">{showNum}</td>
+                                                            <td className="font-bold px-2 py-2 uppercase align-middle text-xs">{t.name}</td>
+                                                            <td className="text-center py-2 align-middle text-xs">{t.nip}</td>
+                                                            <td className="text-center py-2 align-middle text-xs">{t.roomName}</td>
+                                                            <td className="text-center py-2 font-mono align-middle text-xs">{t.checkInTime}</td>
+                                                            <td className="text-center py-2 font-bold align-middle text-xs">
+                                                                {t.name ? (t.checkInTime ? <span className="text-green-600">HADIR</span> : <span className="text-red-500">BELUM</span>) : ''}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* PERBAIKAN: Tanda Tangan Kepala Sekolah di Bagian Bawah */}
+                                    <div className="mt-4 flex justify-end text-sm"> 
+                                        <div className="signature-box text-center w-64"> 
+                                            <div className="mb-4">
+                                                <div>Mengetahui,</div>
+                                                <div>Kepala Sekolah</div>
+                                            </div> 
+                                            <div className="ec-sign-space" style={{height: '60px'}}> 
+                                                {schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />} 
+                                                {schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />} 
+                                            </div> 
+                                            <div className="font-bold underline mt-2">{schoolInfo.headmaster}</div> 
+                                            <div>NIP. {schoolInfo.headmasterNip}</div> 
+                                        </div> 
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 );
             };
@@ -915,19 +1023,77 @@
                     if (a.sub?.date !== b.sub?.date) return (a.sub?.date || '').localeCompare(b.sub?.date || '');
                     return (a.sub?.time || '').localeCompare(b.sub?.time || '');
                 });
-                const ITEMS_PER_PAGE = 18;
-                const chunks = []; for (let i = 0; i < fullSchedules.length; i += ITEMS_PER_PAGE) { chunks.push(fullSchedules.slice(i, i + ITEMS_PER_PAGE)); }
-                if (fullSchedules.length === 0) return <div className="bg-gray-200 p-4 min-h-screen flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow text-center"><i className="fas fa-exclamation-circle text-4xl text-yellow-500 mb-2"></i><p className="text-gray-600 font-bold">Belum ada jadwal yang di-generate.</p><button onClick={() => setView('menu')} className="mt-4 text-blue-600 underline">Kembali</button></div></div>;
+                
+                const ITEMS_PER_PAGE = 15; 
+                const chunks = []; 
+                if (fullSchedules.length === 0) {
+                     chunks.push([]);
+                } else {
+                    for (let i = 0; i < fullSchedules.length; i += ITEMS_PER_PAGE) { 
+                        chunks.push(fullSchedules.slice(i, i + ITEMS_PER_PAGE)); 
+                    }
+                }
+
                 return (
                     <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
                         <BackBtn />
-                        {chunks.map((chunk, pIdx) => (
-                            <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
-                                <DocHeader school={schoolInfo} title="JADWAL TUGAS PENGAWASAN" />
-                                <table className="doc-table"><thead><tr><th className="w-10">No</th><th className="w-32">Hari / Tanggal</th><th className="w-32">Waktu</th><th>Mata Pelajaran</th><th className="w-32">Ruang</th><th className="w-64">Nama Pengawas</th></tr></thead><tbody>{chunk.map((item, idx) => (<tr key={item.id}><td className="text-center">{idx + 1 + (pIdx * ITEMS_PER_PAGE)}</td><td className="text-center">{item.sub?.date}</td><td className="text-center">{item.sub?.time}</td><td className="px-2 font-semibold">{item.sub?.name}</td><td className="text-center">{item.room?.name}</td><td className="px-2 uppercase">{item.teacher?.name || '-'}</td></tr>))}{Array.from({length: Math.max(0, ITEMS_PER_PAGE - chunk.length)}).map((_, i) => (<tr key={`empty-${i}`}><td className="h-8"></td><td></td><td></td><td></td><td></td></tr>))}</tbody></table>
-                                {pIdx === chunks.length - 1 && (<div className="mt-8 flex justify-end text-sm"><div className="signature-box text-center w-64"><div className="mb-2"><div>Kepala Sekolah,</div></div><div className="ec-sign-space" style={{height: '60px'}}>{schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />}{schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />}</div><div className="font-bold underline mt-2">{schoolInfo.headmaster}</div><div>NIP. {schoolInfo.headmasterNip}</div></div></div>)}
-                            </div>
-                        ))}
+                        {chunks.map((chunk, pIdx) => {
+                            const rows = [...chunk];
+                            while(rows.length < ITEMS_PER_PAGE) {
+                                rows.push({ id: `empty-${rows.length}`, sub: {}, room: {}, teacher: {} });
+                            }
+
+                            return (
+                                <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break flex flex-col justify-between">
+                                    <div>
+                                        <DocHeader school={schoolInfo} title="JADWAL TUGAS PENGAWASAN" />
+                                        <table className="doc-table w-full">
+                                            <thead>
+                                                <tr>
+                                                    <th className="w-10 py-2">No</th>
+                                                    <th className="w-32 py-2">Hari / Tanggal</th>
+                                                    <th className="w-24 py-2">Waktu</th>
+                                                    <th className="py-2">Mata Pelajaran</th>
+                                                    <th className="w-24 py-2">Ruang</th>
+                                                    <th className="w-48 py-2">Nama Pengawas</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rows.map((item, idx) => {
+                                                    const rowNum = idx + 1 + (pIdx * ITEMS_PER_PAGE);
+                                                    const showNum = item.sub?.name ? rowNum : '';
+                                                    return (
+                                                        <tr key={item.id || idx}>
+                                                            <td className="text-center h-10 align-middle">{showNum}</td>
+                                                            <td className="text-center align-middle text-xs">{item.sub?.date}</td>
+                                                            <td className="text-center align-middle text-xs">{item.sub?.time}</td>
+                                                            <td className="px-2 font-semibold align-middle text-xs">{item.sub?.name}</td>
+                                                            <td className="text-center align-middle text-xs">{item.room?.name}</td>
+                                                            <td className="px-2 uppercase align-middle text-xs">{item.teacher?.name || (item.sub?.name ? '-' : '')}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div className="mt-4 flex justify-end text-sm">
+                                        <div className="signature-box text-center w-64">
+                                            <div className="mb-4">
+                                                <div>Mengetahui,</div>
+                                                <div>Kepala Sekolah</div>
+                                            </div>
+                                            <div className="ec-sign-space" style={{height: '60px'}}>
+                                                {schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />}
+                                                {schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />}
+                                            </div>
+                                            <div className="font-bold underline mt-2">{schoolInfo.headmaster}</div>
+                                            <div>NIP. {schoolInfo.headmasterNip}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 );
             };
@@ -1026,79 +1192,115 @@
             const CollectionListLayout = () => {
                 // Filter guru yang memiliki data mapel/kelas (asumsi guru aktif)
                 const activeTeachers = teachers.filter(t => t.subjects && t.subjects.length > 0).sort((a,b) => a.name.localeCompare(b.name));
-                const ITEMS_PER_PAGE = 12; // Lebih sedikit karena konten teks mungkin panjang
+                
+                // PERBAIKAN: Kurangi baris per halaman agar muat tanda tangan
+                const ITEMS_PER_PAGE = 10; 
+                
                 const chunks = [];
-                for (let i = 0; i < activeTeachers.length; i += ITEMS_PER_PAGE) {
-                    chunks.push(activeTeachers.slice(i, i + ITEMS_PER_PAGE));
+                if (activeTeachers.length === 0) {
+                     chunks.push([]);
+                } else {
+                    for (let i = 0; i < activeTeachers.length; i += ITEMS_PER_PAGE) {
+                        chunks.push(activeTeachers.slice(i, i + ITEMS_PER_PAGE));
+                    }
                 }
-
-                if (activeTeachers.length === 0) return <div className="bg-gray-200 p-4 min-h-screen flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow text-center"><i className="fas fa-exclamation-triangle text-4xl text-yellow-500 mb-2"></i><p className="text-gray-600 font-bold">Data Guru belum lengkap.</p><p className="text-sm text-gray-500">Pastikan Data Guru sudah diisi Mapel & Kelas di menu Data Master.</p><button onClick={() => setView('menu')} className="mt-4 text-blue-600 underline">Kembali</button></div></div>;
 
                 return (
                     <div className="bg-gray-200 p-4 min-h-screen overflow-auto print-wrapper print:p-0 print:bg-white print:overflow-visible">
                         <BackBtn />
-                        {chunks.map((chunk, pIdx) => (
-                            <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break">
-                                <DocHeader school={schoolInfo} title="DAFTAR PENGAMBILAN LEMBAR JAWABAN" />
-                                <div className="mb-4 text-sm font-bold text-center border border-black p-2 bg-gray-50">
-                                    Hari / Tanggal Pengambilan: ............................................................................
-                                </div>
-                                <table className="doc-table">
-                                    <thead>
-                                        <tr>
-                                            <th className="w-10 py-3">No</th>
-                                            <th className="py-3">Nama Guru & NIP</th>
-                                            <th className="w-1/4 py-3">Mata Pelajaran Diampu</th>
-                                            <th className="w-1/4 py-3">Kelas Diajar</th>
-                                            <th className="w-32 py-3">Tanda Tangan</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {chunk.map((t, idx) => {
-                                            const globalIdx = idx + 1 + (pIdx * ITEMS_PER_PAGE);
-                                            return (
-                                                <tr key={t.id}>
-                                                    <td className="text-center align-top py-3">{globalIdx}</td>
-                                                    <td className="align-top py-3 px-3">
-                                                        <div className="font-bold uppercase text-sm">{t.name}</div>
-                                                        <div className="text-xs text-gray-500 mt-1">NIP. {t.nip}</div>
-                                                    </td>
-                                                    <td className="align-top py-3 px-3 text-sm">
-                                                        {t.subjects && t.subjects.length > 0 ? (
-                                                            <ul className="list-disc list-inside text-xs">
-                                                                {t.subjects.map((sub, i) => <li key={i}>{sub}</li>)}
-                                                            </ul>
-                                                        ) : '-'}
-                                                    </td>
-                                                    <td className="align-top py-3 px-3 text-sm">
-                                                        <div className="text-xs leading-relaxed">{t.classes ? t.classes.join(', ') : '-'}</div>
-                                                    </td>
-                                                    <td className="text-left align-bottom px-2 text-xs text-gray-400 h-20 border-b-0">
-                                                        {globalIdx % 2 === 1 ? `${globalIdx}..........` : `..........${globalIdx}`}
-                                                    </td>
+                        {chunks.map((chunk, pIdx) => {
+                            // FILL EMPTY ROWS agar tabel selalu penuh proporsional
+                            const rows = [...chunk];
+                            while(rows.length < ITEMS_PER_PAGE) {
+                                rows.push({ id: `empty-${rows.length}` });
+                            }
+
+                            return (
+                                <div key={pIdx} className="a4-sheet mx-auto bg-white mb-4 page-break flex flex-col justify-between">
+                                    <div>
+                                        <DocHeader school={schoolInfo} title="DAFTAR PENGAMBILAN LEMBAR JAWABAN" />
+                                        
+                                        <table className="doc-table w-full">
+                                            <thead>
+                                                <tr>
+                                                    <th className="w-10 py-2">No</th>
+                                                    <th className="py-2">Nama Guru & NIP</th>
+                                                    <th className="w-1/4 py-2">Mata Pelajaran Diampu</th>
+                                                    <th className="w-1/4 py-2">Kelas Diajar</th>
+                                                    <th className="w-32 py-2">Tanda Tangan</th>
                                                 </tr>
-                                            );
-                                        })}
-                                        {/* Row Filler untuk halaman terakhir */}
-                                        {Array.from({length: Math.max(0, ITEMS_PER_PAGE - chunk.length)}).map((_, i) => (
-                                            <tr key={`empty-${i}`}><td className="h-20"></td><td></td><td></td><td></td><td></td></tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                                
-                                {pIdx === chunks.length - 1 && (
-                                    <div className="mt-12 flex justify-end text-sm">
+                                            </thead>
+                                            <tbody>
+                                                {rows.map((t, idx) => {
+                                                    const globalIdx = idx + 1 + (pIdx * ITEMS_PER_PAGE);
+                                                    // Cek apakah ini baris data atau baris kosong
+                                                    const isData = !!t.name;
+
+                                                    return (
+                                                        <tr key={t.id || idx}>
+                                                            <td className="text-center align-top py-2 h-16">{isData ? globalIdx : ''}</td>
+                                                            <td className="align-top py-2 px-2">
+                                                                {isData && (
+                                                                    <>
+                                                                        <div className="font-bold uppercase text-xs">{t.name}</div>
+                                                                        <div className="text-[10px] text-gray-500 mt-1">NIP. {t.nip}</div>
+                                                                    </>
+                                                                )}
+                                                            </td>
+                                                            <td className="align-top py-2 px-2 text-xs">
+                                                                {isData && t.subjects && t.subjects.length > 0 ? (
+                                                                    <ul className="list-disc list-inside">
+                                                                        {t.subjects.map((sub, i) => <li key={i}>{sub}</li>)}
+                                                                    </ul>
+                                                                ) : (isData ? '-' : '')}
+                                                            </td>
+                                                            <td className="align-top py-2 px-2 text-xs">
+                                                                {isData && t.classes ? (
+                                                                    <div className="leading-relaxed">{t.classes.join(', ')}</div>
+                                                                ) : (isData ? '-' : '')}
+                                                            </td>
+                                                            <td className="text-left align-bottom px-2 text-xs text-gray-400 border-b-0">
+                                                                {isData ? (globalIdx % 2 === 1 ? `${globalIdx}..........` : `..........${globalIdx}`) : ''}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    {/* PERBAIKAN: Tanda Tangan Lengkap (Panitia & Kepala Sekolah) */}
+                                    <div className="mt-4 flex justify-between text-sm items-end">
                                         <div className="signature-box text-center w-64">
-                                            <div className="mb-2"><div>Koordinator Ujian / Panitia,</div></div>
+                                            {/* Posisi Hari/Tanggal dipindah ke sini */}
+                                            <div className="mb-2 text-left pl-2 font-bold" style={{fontSize: '11px'}}>
+                                                Hari/Tanggal: .......................................
+                                            </div>
+                                            <div className="mb-4">
+                                                <div>Koordinator Ujian / Panitia,</div>
+                                            </div>
                                             <div className="ec-sign-space" style={{height: '60px'}}>
-                                                {/* Space TTD Panitia (Kosong atau Upload) */}
+                                                {/* Space untuk TTD Panitia manual */}
                                             </div>
                                             <div className="font-bold underline mt-2">( ............................................ )</div>
                                         </div>
+
+                                        <div className="signature-box text-center w-64">
+                                            <div className="mb-4">
+                                                <div>Mengetahui,</div>
+                                                <div>Kepala Sekolah</div>
+                                            </div>
+                                            <div className="ec-sign-space" style={{height: '60px'}}>
+                                                {schoolInfo.signature && <img src={schoolInfo.signature} className="sign-img" alt="TTD" />}
+                                                {schoolInfo.stamp && <img src={schoolInfo.stamp} className="stamp-img" alt="Cap" />}
+                                            </div>
+                                            <div className="font-bold underline mt-2">{schoolInfo.headmaster}</div>
+                                            <div>NIP. {schoolInfo.headmasterNip}</div>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                        ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 );
             };
@@ -1293,6 +1495,80 @@
             );
         };
 
+        const Dashboard = ({ stats, schedules, subjects, rooms = [], students = [], attendance = {} }) => {
+            const [date, setDate] = useState(new Date());
+            const [viewMode, setViewMode] = useState('grid');
+            
+            useEffect(() => { const timer = setInterval(() => setDate(new Date()), 60000); return () => clearInterval(timer); }, []);
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+
+            // Logic Monitoring Ruang
+            const roomStats = rooms.map(room => {
+                const roomStudents = students.filter(s => String(s.roomId) === String(room.id));
+                const total = roomStudents.length;
+                const roomSchedules = schedules.filter(s => String(s.roomId) === String(room.id));
+                const uniqueAbsentStudents = new Set();
+                roomSchedules.forEach(sch => {
+                    const key = `${sch.subjectId}-${sch.roomId}`;
+                    const log = attendance[key] || {};
+                    Object.entries(log).forEach(([studentId, status]) => {
+                        if (['S', 'I', 'A'].includes(status)) {
+                            uniqueAbsentStudents.add(studentId);
+                        }
+                    });
+                });
+                const absentList = Array.from(uniqueAbsentStudents).map(id => {
+                    const st = students.find(s => String(s.id) === String(id));
+                    return st ? st.name : `ID: ${id}`;
+                });
+                return { ...room, total, absentCount: uniqueAbsentStudents.size, absentList };
+            });
+
+            return ( 
+                <div className="space-y-8 animate-fade-in-down pb-10"> 
+                    <div className="flex flex-col md:flex-row justify-between items-end gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100"> 
+                        <div><h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2><p className="text-slate-500 mt-1">Pantau aktivitas asesmen secara real-time (Online Mode).</p></div> 
+                        <div className="text-right"><div className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-1">{date.toLocaleDateString('id-ID', dateOptions)}</div><p className="text-xs text-slate-400">Semester Ganjil 2023/2024</p></div> 
+                    </div> 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"> 
+                        <StatCard title="Total Peserta" value={stats.s || 0} icon="fa-user-graduate" color="text-blue-600" /> 
+                        <StatCard title="Pengawas" value={stats.t || 0} icon="fa-chalkboard-teacher" color="text-emerald-600" /> 
+                        <StatCard title="Mapel Ujian" value={stats.m || 0} icon="fa-book" color="text-violet-600" /> 
+                        <StatCard title="Ruang Ujian" value={stats.r || 0} icon="fa-door-open" color="text-orange-600" /> 
+                    </div> 
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-rose-100 text-rose-600 w-8 h-8 rounded flex items-center justify-center"><i className="fas fa-clipboard-check"></i></div>
+                                <h3 className="font-bold text-slate-700 text-lg">Monitoring Kehadiran Per Ruang</h3>
+                            </div>
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                                <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><i className="fas fa-th-large mr-1"></i> Kartu</button>
+                                <button onClick={() => setViewMode('table')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><i className="fas fa-list mr-1"></i> Tabel</button>
+                            </div>
+                        </div>
+                        {viewMode === 'grid' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {roomStats.map(r => (
+                                    <div key={r.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 hover:bg-white hover:shadow-md transition duration-300">
+                                        <div className="flex justify-between items-start mb-3 border-b border-slate-200 pb-3"><div><div className="font-bold text-slate-800 text-lg">{r.name}</div><div className="text-xs text-slate-500">Kapasitas: {r.capacity} Kursi</div></div><div className="text-right"><div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Siswa</div><div className="text-xl font-black text-slate-700">{r.total}</div></div></div>
+                                        <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                            <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-rose-600 uppercase tracking-wide">Tidak Hadir</span><span className={`text-lg font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>{r.absentCount} <span className="text-xs font-normal text-slate-400">Siswa</span></span></div>
+                                            {r.absentCount > 0 ? (<div className="mt-2 space-y-1 max-h-24 overflow-y-auto custom-scrollbar">{r.absentList.map((name, i) => (<div key={i} className="text-xs text-slate-600 bg-rose-50 px-2 py-1 rounded border border-rose-100 flex items-center gap-2"><i className="fas fa-times-circle text-rose-400 text-[10px]"></i><span className="truncate">{name}</span></div>))}</div>) : (<div className="text-xs text-emerald-600 bg-emerald-50 px-2 py-2 rounded border border-emerald-100 text-center font-medium"><i className="fas fa-check-circle mr-1"></i> Semua Hadir / Belum Absen</div>)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                                <table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b border-slate-200"><tr><th className="px-4 py-3">Nama Ruang</th><th className="px-4 py-3 text-center">Kapasitas</th><th className="px-4 py-3 text-center">Total Siswa</th><th className="px-4 py-3 text-center">Hadir</th><th className="px-4 py-3 text-center">Tidak Hadir</th><th className="px-4 py-3 w-1/3">Detail Ketidakhadiran</th></tr></thead><tbody className="divide-y divide-slate-100 bg-white">{roomStats.map(r => (<tr key={r.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-bold text-slate-700">{r.name}</td><td className="px-4 py-3 text-center text-slate-500">{r.capacity}</td><td className="px-4 py-3 text-center font-bold">{r.total}</td><td className="px-4 py-3 text-center text-emerald-600 font-bold">{r.total - r.absentCount}</td><td className={`px-4 py-3 text-center font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-slate-300'}`}>{r.absentCount}</td><td className="px-4 py-3">{r.absentCount > 0 ? (<div className="flex flex-wrap gap-1">{r.absentList.map((name, i) => (<span key={i} className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded border border-rose-100 truncate max-w-[150px]" title={name}>{name}</span>))}</div>) : (<span className="text-xs text-emerald-500 italic"><i className="fas fa-check mr-1"></i> Lengkap</span>)}</td></tr>))}</tbody></table>
+                            </div>
+                        )}
+                    </div>
+                </div> 
+            );
+        };
+
         const App = () => {
             const [user, setUser] = useState(null); 
             const [page, setPage] = useState('dashboard');
@@ -1369,92 +1645,6 @@
                 </div>
             );
         };
-
-        const Dashboard = ({ stats, schedules, subjects, rooms = [], students = [], attendance = {} }) => {
-            const [date, setDate] = useState(new Date());
-            const [viewMode, setViewMode] = useState('grid');
-            
-            useEffect(() => { const timer = setInterval(() => setDate(new Date()), 60000); return () => clearInterval(timer); }, []);
-            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-
-            // Logic Monitoring Ruang
-            const roomStats = rooms.map(room => {
-                const roomStudents = students.filter(s => String(s.roomId) === String(room.id));
-                const total = roomStudents.length;
-                const roomSchedules = schedules.filter(s => String(s.roomId) === String(room.id));
-                const uniqueAbsentStudents = new Set();
-                roomSchedules.forEach(sch => {
-                    const key = `${sch.subjectId}-${sch.roomId}`;
-                    const log = attendance[key] || {};
-                    Object.entries(log).forEach(([studentId, status]) => {
-                        if (['S', 'I', 'A'].includes(status)) {
-                            uniqueAbsentStudents.add(studentId);
-                        }
-                    });
-                });
-                const absentList = Array.from(uniqueAbsentStudents).map(id => {
-                    const st = students.find(s => String(s.id) === String(id));
-                    return st ? st.name : `ID: ${id}`;
-                });
-                return { ...room, total, absentCount: uniqueAbsentStudents.size, absentList };
-            });
-
-            return ( 
-                <div className="space-y-8 animate-fade-in-down pb-10"> 
-                    <div className="flex flex-col md:flex-row justify-between items-end gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100"> 
-                        <div><h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2><p className="text-slate-500 mt-1">Pantau aktivitas asesmen secara real-time (Online Mode).</p></div> 
-                        <div className="text-right"><div className="text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-1">{date.toLocaleDateString('id-ID', dateOptions)}</div><p className="text-xs text-slate-400">Semester Ganjil 2023/2024</p></div> 
-                    </div> 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"> 
-                        <StatCard title="Total Peserta" value={stats.s || 0} icon="fa-user-graduate" color="text-blue-600" /> 
-                        <StatCard title="Pengawas" value={stats.t || 0} icon="fa-chalkboard-teacher" color="text-emerald-600" /> 
-                        <StatCard title="Mapel Ujian" value={stats.m || 0} icon="fa-book" color="text-violet-600" /> 
-                        <StatCard title="Ruang Ujian" value={stats.r || 0} icon="fa-door-open" color="text-orange-600" /> 
-                    </div> 
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                        <div className="flex justify-between items-center mb-6">
-                            <div className="flex items-center gap-2">
-                                <div className="bg-rose-100 text-rose-600 w-8 h-8 rounded flex items-center justify-center"><i className="fas fa-clipboard-check"></i></div>
-                                <h3 className="font-bold text-slate-700 text-lg">Monitoring Kehadiran Per Ruang</h3>
-                            </div>
-                            <div className="flex bg-slate-100 p-1 rounded-lg">
-                                <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><i className="fas fa-th-large mr-1"></i> Kartu</button>
-                                <button onClick={() => setViewMode('table')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><i className="fas fa-list mr-1"></i> Tabel</button>
-                            </div>
-                        </div>
-                        {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {roomStats.map(r => (
-                                    <div key={r.id} className="border border-slate-200 rounded-xl p-4 bg-slate-50 hover:bg-white hover:shadow-md transition duration-300">
-                                        <div className="flex justify-between items-start mb-3 border-b border-slate-200 pb-3"><div><div className="font-bold text-slate-800 text-lg">{r.name}</div><div className="text-xs text-slate-500">Kapasitas: {r.capacity} Kursi</div></div><div className="text-right"><div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Siswa</div><div className="text-xl font-black text-slate-700">{r.total}</div></div></div>
-                                        <div className="bg-white rounded-lg p-3 border border-slate-100">
-                                            <div className="flex justify-between items-center mb-2"><span className="text-xs font-bold text-rose-600 uppercase tracking-wide">Tidak Hadir</span><span className={`text-lg font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-emerald-500'}`}>{r.absentCount} <span className="text-xs font-normal text-slate-400">Siswa</span></span></div>
-                                            {r.absentCount > 0 ? (<div className="mt-2 space-y-1 max-h-24 overflow-y-auto custom-scrollbar">{r.absentList.map((name, i) => (<div key={i} className="text-xs text-slate-600 bg-rose-50 px-2 py-1 rounded border border-rose-100 flex items-center gap-2"><i className="fas fa-times-circle text-rose-400 text-[10px]"></i><span className="truncate">{name}</span></div>))}</div>) : (<div className="text-xs text-emerald-600 bg-emerald-50 px-2 py-2 rounded border border-emerald-100 text-center font-medium"><i className="fas fa-check-circle mr-1"></i> Semua Hadir / Belum Absen</div>)}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                                <table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500 font-bold uppercase text-xs border-b border-slate-200"><tr><th className="px-4 py-3">Nama Ruang</th><th className="px-4 py-3 text-center">Kapasitas</th><th className="px-4 py-3 text-center">Total Siswa</th><th className="px-4 py-3 text-center">Hadir</th><th className="px-4 py-3 text-center">Tidak Hadir</th><th className="px-4 py-3 w-1/3">Detail Ketidakhadiran</th></tr></thead><tbody className="divide-y divide-slate-100 bg-white">{roomStats.map(r => (<tr key={r.id} className="hover:bg-slate-50"><td className="px-4 py-3 font-bold text-slate-700">{r.name}</td><td className="px-4 py-3 text-center text-slate-500">{r.capacity}</td><td className="px-4 py-3 text-center font-bold">{r.total}</td><td className="px-4 py-3 text-center text-emerald-600 font-bold">{r.total - r.absentCount}</td><td className={`px-4 py-3 text-center font-bold ${r.absentCount > 0 ? 'text-rose-600' : 'text-slate-300'}`}>{r.absentCount}</td><td className="px-4 py-3">{r.absentCount > 0 ? (<div className="flex flex-wrap gap-1">{r.absentList.map((name, i) => (<span key={i} className="text-[10px] bg-rose-50 text-rose-600 px-2 py-0.5 rounded border border-rose-100 truncate max-w-[150px]" title={name}>{name}</span>))}</div>) : (<span className="text-xs text-emerald-500 italic"><i className="fas fa-check mr-1"></i> Lengkap</span>)}</td></tr>))}</tbody></table>
-                            </div>
-                        )}
-                    </div>
-                </div> 
-            );
-        };
-
-        const StatCard = ({ title, value, icon, color }) => (
-            <div className={`p-4 rounded-xl shadow-sm bg-white border-l-4 ${color.replace('text-', 'border-')} flex justify-between items-center transform hover:-translate-y-1 transition duration-200`}>
-                <div>
-                    <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{title}</p>
-                    <p className="text-2xl font-bold text-gray-800">{value}</p>
-                </div>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl bg-gray-50 ${color}`}>
-                    <i className={`fas ${icon}`}></i>
-                </div>
-            </div>
-        );
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
