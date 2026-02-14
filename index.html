@@ -522,6 +522,9 @@
                 {id:'kartu', t:'Kartu Peserta', d:'Cetak kartu ujian dengan QR Code untuk siswa.', i:'fa-id-card', c:'blue'},
                 {id:'hadir-siswa', t:'Daftar Hadir Siswa', d:'Format presensi siswa per ruang ujian.', i:'fa-clipboard-list', c:'emerald'},
                 {id:'hadir-pengawas', t:'Daftar Hadir Pengawas', d:'Lembar tanda tangan pengawas per sesi.', i:'fa-user-pen', c:'violet'},
+                {id:'distribusi', t:'Jadwal Pengawas', d:'Rekap jadwal tugas pengawas per sesi.', i:'fa-calendar-check', c:'teal'},
+                {id:'rekap-pengawas', t:'Rekap Check-In', d:'Log waktu kehadiran digital pengawas.', i:'fa-clock-rotate-left', c:'teal'},
+                {id:'absensi-siswa', t:'Ketidakhadiran', d:'Laporan siswa yang tidak hadir ujian.', i:'fa-user-xmark', c:'red'},
                 {id:'label-meja', t:'Label Meja', d:'Stiker nomor meja untuk ditempel.', i:'fa-tags', c:'amber'},
                 {id:'label-ruang', t:'Label Ruang', d:'Tanda pengenal besar untuk pintu ruang.', i:'fa-door-closed', c:'indigo'},
                 {id:'ba-ljk', t:'Serah Terima LJK', d:'Checklist penyerahan LJK ke panitia.', i:'fa-file-signature', c:'rose'},
@@ -976,7 +979,7 @@
             const date = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
             const html = `
             <div class="space-y-4">
-                ${!['distribusi', 'ba-ljk', 'ba-soal', 'ba-guru'].includes(type) ?`<div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Filter Ruang</label><select id="print-room-filter" class="w-full border border-slate-300 rounded-xl p-3 bg-slate-50 outline-none"><option value="all">Semua Ruang</option>${rooms.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>`:''}
+                ${!['distribusi', 'ba-ljk', 'ba-soal', 'ba-guru', 'absensi-siswa', 'rekap-pengawas'].includes(type) ?`<div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Filter Ruang</label><select id="print-room-filter" class="w-full border border-slate-300 rounded-xl p-3 bg-slate-50 outline-none"><option value="all">Semua Ruang</option>${rooms.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>`:''}
                 <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Titimangsa</label><input type="text" id="print-date-input" value="${date}" class="w-full border border-slate-300 rounded-xl p-3 bg-slate-50 outline-none"></div>
                 <div class="flex justify-end gap-2 pt-4">
                     <button onclick="closeModal()" class="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">Batal</button>
@@ -1004,6 +1007,44 @@
                     grp[t].sort((a,b) => a.waktu.localeCompare(b.waktu) || a.ruang.localeCompare(b.ruang));
                     html += `<div class="mb-8 break-inside-avoid"><div class="text-center mb-4 pb-2 border-b-2 border-black"><h2 class="font-bold text-xl uppercase">${s.namaSekolah}</h2><p>JADWAL PENGAWAS - ${s.semester} ${s.tahunAjaran}</p></div><h3 class="font-bold mb-2">Tanggal: ${t}</h3><table class="w-full border-collapse border border-black text-sm mb-4"><thead class="bg-gray-200"><tr><th class="border border-black p-1">Waktu</th><th class="border border-black p-1">Mapel</th><th class="border border-black p-1">Ruang</th><th class="border border-black p-1">Pengawas</th></tr></thead><tbody>${grp[t].map(d=>`<tr><td class="border border-black p-1">${d.waktu}</td><td class="border border-black p-1">${d.mapel}</td><td class="border border-black p-1 text-center font-bold">${d.ruang}</td><td class="border border-black p-1">${d.pengawas}</td></tr>`).join('')}</tbody></table><div class="flex justify-end mt-8"><div class="text-center min-w-[150px]"><p class="text-sm">${s.kota}, ${date}</p><p class="text-sm font-bold mb-12">Kepala Sekolah,</p><p class="text-sm font-bold underline uppercase">${s.kepsek}</p><p class="text-sm">NIP. ${s.nipKepsek}</p></div></div></div>`;
                 });
+            } else if (type === 'rekap-pengawas') {
+                let schedules = window.appData.jadwalPengawas || [];
+                schedules.sort((a,b) => a.tanggal.localeCompare(b.tanggal) || a.waktu.localeCompare(b.waktu) || a.ruang.localeCompare(b.ruang));
+                
+                if (schedules.length === 0) { window.showToast("Belum ada jadwal pengawas.", "error"); return; }
+                
+                html += `<div class="p-8 border border-slate-200 min-h-screen"><div class="flex items-center gap-4 mb-4 border-b-2 border-black pb-4"><div class="w-16 h-16 flex items-center justify-center">${logo.replace('w-8','w-16')}</div><div class="flex-1 text-center"><h2 class="font-bold text-xl uppercase">${s.namaDinas}</h2><h1 class="font-bold text-2xl uppercase">${s.namaSekolah}</h1><p>${s.alamat}</p></div></div><div class="text-center mb-6"><h2 class="font-bold text-lg uppercase underline">REKAP CHECK-IN PENGAWAS</h2><p class="font-bold uppercase">TAHUN PELAJARAN ${s.tahunAjaran}</p></div><table class="w-full border-collapse border border-black text-sm"><thead><tr class="bg-gray-100"><th class="border border-black p-2 w-10">No</th><th class="border border-black p-2">Hari/Tanggal</th><th class="border border-black p-2">Waktu</th><th class="border border-black p-2">Ruang</th><th class="border border-black p-2">Mata Pelajaran</th><th class="border border-black p-2">Nama Pengawas</th><th class="border border-black p-2">Jam Check-In</th><th class="border border-black p-2">Status</th></tr></thead><tbody>${schedules.map((sch, i) => {
+                    const rep = window.appData.laporanUjian.find(l => l.jadwalId === sch.id || (l.ruang === sch.ruang && l.mapel === sch.mapel && l.tanggal === sch.tanggal && l.waktu === sch.waktu));
+                    const checkIn = rep && rep.waktuCheckIn ? rep.waktuCheckIn : '-';
+                    const status = checkIn !== '-' ? 'HADIR' : 'BELUM';
+                    return `<tr><td class="border border-black p-2 text-center">${i+1}</td><td class="border border-black p-2">${sch.tanggal}</td><td class="border border-black p-2 text-center">${sch.waktu}</td><td class="border border-black p-2 text-center">${sch.ruang}</td><td class="border border-black p-2">${sch.mapel}</td><td class="border border-black p-2 font-bold uppercase">${sch.pengawas}</td><td class="border border-black p-2 text-center font-mono font-bold">${checkIn}</td><td class="border border-black p-2 text-center text-xs font-bold">${status}</td></tr>`;
+                }).join('')}</tbody></table><div class="mt-8 flex justify-end"><div class="text-center w-64"><p class="text-sm mb-20">${s.kota}, ${date}<br>Kepala Sekolah,</p><p class="font-bold border-b border-black inline-block min-w-[150px]">${s.kepsek}</p><p class="text-xs mt-1">NIP. ${s.nipKepsek}</p></div></div></div>`;
+
+            } else if (type === 'absensi-siswa') {
+                let absences = [];
+                window.appData.laporanUjian.forEach(lap => {
+                    lap.absensi.forEach(stud => {
+                        if(stud.status !== 'H') {
+                            const siswaData = window.appData.siswa.find(s => s.id === stud.id) || {};
+                            const ketMap = {'S':'Sakit', 'I':'Izin', 'A':'Alpa'};
+                            absences.push({
+                                nama: stud.nama,
+                                no: stud.noUjian,
+                                ruang: lap.ruang,
+                                kelas: siswaData.kelas || '-',
+                                mapel: lap.mapel,
+                                waktu: `${lap.tanggal} / ${lap.waktu}`,
+                                status: ketMap[stud.status] || stud.status
+                            });
+                        }
+                    });
+                });
+
+                if (absences.length === 0) { window.showToast("Tidak ada data ketidakhadiran.", "info"); return; }
+                absences.sort((a,b) => a.kelas.localeCompare(b.kelas) || a.nama.localeCompare(b.nama));
+
+                html += `<div class="p-8 border border-slate-200 min-h-screen"><div class="flex items-center gap-4 mb-4 border-b-2 border-black pb-4"><div class="w-16 h-16 flex items-center justify-center">${logo.replace('w-8','w-16')}</div><div class="flex-1 text-center"><h2 class="font-bold text-xl uppercase">${s.namaDinas}</h2><h1 class="font-bold text-2xl uppercase">${s.namaSekolah}</h1><p>${s.alamat}</p></div></div><div class="text-center mb-6"><h2 class="font-bold text-lg uppercase underline">DAFTAR KETIDAKHADIRAN PESERTA UJIAN</h2><p class="font-bold uppercase">TAHUN PELAJARAN ${s.tahunAjaran}</p></div><table class="w-full border-collapse border border-black text-sm"><thead><tr class="bg-gray-100"><th class="border border-black p-2 w-10">No</th><th class="border border-black p-2">Nama Peserta</th><th class="border border-black p-2">Kelas</th><th class="border border-black p-2">Mata Pelajaran</th><th class="border border-black p-2">Hari/Tanggal</th><th class="border border-black p-2">Keterangan</th></tr></thead><tbody>${absences.map((d, i) => `<tr><td class="border border-black p-2 text-center">${i+1}</td><td class="border border-black p-2 font-bold uppercase">${d.nama}<br><span class="font-normal text-xs">${d.no}</span></td><td class="border border-black p-2 text-center">${d.kelas}</td><td class="border border-black p-2">${d.mapel}</td><td class="border border-black p-2 text-center">${d.waktu}</td><td class="border border-black p-2 text-center font-bold">${d.status}</td></tr>`).join('')}</tbody></table><div class="mt-8 flex justify-end"><div class="text-center w-64"><p class="text-sm mb-20">${s.kota}, ${date}<br>Koordinator Ujian,</p><p class="font-bold border-b border-black inline-block min-w-[150px]"></p></div></div></div>`;
+
             } else if (type === 'hadir-pengawas') {
                 let schedules = window.appData.jadwalPengawas || [];
                 if (roomFilter !== 'all') schedules = schedules.filter(s => s.ruang === roomFilter);
